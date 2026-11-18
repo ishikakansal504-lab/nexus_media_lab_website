@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>My account | Nexus Media Labs</title><link rel="stylesheet" href="assets/auth.css"></head>
+<body>
+<header class="top"><div class="in">
+  <a class="brand" href="index.html"><span class="mark">N</span><span>NEXUS<small>MEDIA LABS</small></span></a>
+  <nav id="nav"></nav>
+</div></header>
+<main class="wrap">
+  <h1 id="hello">Hello</h1>
+  <p class="muted" id="sub">This is your Nexus Media Labs account.</p>
+  <section class="card" id="panel" style="margin-top:22px;display:none"></section>
+  <div class="grid g2" style="margin-top:22px">
+    <section class="card">
+      <h2>Your profile</h2>
+      <dl class="kv" id="kv"></dl>
+    </section>
+    <section class="card">
+      <h2>Change password</h2>
+      <div id="msg" class="alert"></div>
+      <form id="f" novalidate>
+        <label for="cur">Current password</label><div class="pw"><input id="cur" type="password" autocomplete="current-password"><button type="button">Show</button></div>
+        <label for="nw">New password</label><div class="pw"><input id="nw" type="password" autocomplete="new-password" placeholder="8+ characters, letters and numbers"><button type="button">Show</button></div>
+        <button class="btn" id="go" type="submit">Update password</button>
+      </form>
+    </section>
+  </div>
+</main>
+<script src="assets/auth.js"></script><script src="assets/shop.js"></script>
+<script>
+wirePwToggles();
+function panel(html) { $('panel').style.display = ''; $('panel').innerHTML = html; }
+(async function () {
+  var me = await guard(null); if (!me) return;
+  var u = me.user;
+  if (u.role === 'employee') { location.replace('employee.html'); return; }
+  $('hello').textContent = 'Hello, ' + u.name.split(' ')[0];
+  var roleName = { admin: 'Administrator', employee: 'Employee', customer: 'Customer' }[u.role];
+  $('kv').innerHTML = '<dt>Name</dt><dd>' + esc(u.name) + '</dd><dt>Email</dt><dd>' + esc(u.email) + '</dd>' +
+    '<dt>Account</dt><dd><span class="badge ' + u.role + '">' + roleName + '</span></dd>' +
+    '<dt>Member since</dt><dd>' + esc(fmtDate(u.created_at)) + '</dd><dt>Last login</dt><dd>' + esc(fmtDate(u.last_login)) + '</dd>';
+  if (u.role === 'employee') {
+    $('sub').textContent = 'Keep your portfolio up to date. The admin can see it.';
+    panel('<div style="display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap"><div><h2 style="margin:0">My portfolio</h2><p class="muted">Add your information, upload your work and links.</p></div>' +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap"><a class="btn" href="portfolio.html">Edit my portfolio</a><a class="btn ghost" href="view.html">Preview</a></div></div>');
+  } else if (u.role === 'admin') {
+    $('sub').textContent = 'You manage the agency from the admin panel.';
+    panel('<div style="display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap"><div><h2 style="margin:0">Admin</h2><p class="muted">Users, orders, sales and profit, services and payment settings.</p></div>' +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap"><a class="btn" href="admin.html">Admin panel</a><a class="btn ghost" href="admin-reports.html">Sales and profit</a></div></div>');
+  } else {
+    $('sub').textContent = 'Buy services, follow your orders and see what you bought earlier.';
+    var r = await call('orders.php');
+    var o = r.ok ? r.orders : [];
+    panel('<div style="display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap"><div><h2 style="margin:0">Your orders</h2><p class="muted">' +
+      (r.ok ? r.stats.orders + ' purchase(s), ' + inr(r.stats.total) + ' spent in total.' : '') + '</p></div>' +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap"><a class="btn" href="shop.html">Browse services</a><a class="btn ghost" href="cart.html">My cart</a><a class="btn ghost" href="orders.html">All my orders</a></div></div>' +
+      (o.length ? '<div class="tbl" style="margin-top:16px"><table style="min-width:520px"><thead><tr><th>Order</th><th>Date</th><th class="num">Total</th><th>Status</th></tr></thead><tbody>' +
+        o.slice(0, 3).map(function (x) { return '<tr><td>' + esc(x.order_no) + '</td><td>' + esc(fmtDate(x.created_at)) + '</td><td class="num">' + inr(x.total) + '</td><td><span class="badge ' + x.status + '">' + x.status + '</span></td></tr>'; }).join('') + '</tbody></table></div>' : ''));
+  }
+})();
+$('f').addEventListener('submit', async function (e) {
+  e.preventDefault(); showMsg('msg', '');
+  if (!$('cur').value || !$('nw').value) { showMsg('msg', 'Fill in both password fields.'); return; }
+  $('go').disabled = true;
+  var r = await call('change_password.php', { current: $('cur').value, new: $('nw').value });
+  $('go').disabled = false;
+  if (!r.ok) { showMsg('msg', r.error); return; }
+  $('f').reset(); showMsg('msg', 'Password updated.', true);
+});
+</script></body></html>

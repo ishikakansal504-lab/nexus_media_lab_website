@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shop | Nexus Media Labs</title><link rel="stylesheet" href="assets/auth.css"></head>
+<body>
+<header class="top"><div class="in">
+  <a class="brand" href="index.html"><span class="mark">N</span><span>NEXUS<small>MEDIA LABS</small></span></a>
+  <nav id="nav"></nav>
+</div></header>
+<main class="wrap">
+  <h1>Our services</h1>
+  <p class="muted">Choose what you need and add it to your cart. Prices are in Indian Rupees. For a custom package, <a href="index.html">contact us</a>.</p>
+  <div id="note" class="alert"></div>
+  <div class="chipbar" id="cats"></div>
+  <div class="svc-grid" id="grid"></div>
+</main>
+<script src="assets/auth.js"></script><script src="assets/shop.js"></script>
+<script>
+var SERVICES = [], ME = null, CAT = 'All';
+function draw() {
+  var list = SERVICES.filter(function (s) { return CAT === 'All' || s.category === CAT; });
+  var canBuy = ME && ME.role === 'customer';
+  $('grid').innerHTML = list.map(function (s) {
+    var buy = canBuy
+      ? '<div class="buyrow"><div class="qty"><button type="button" data-q="-1" data-id="' + s.id + '">&minus;</button><input id="q' + s.id + '" value="1" inputmode="numeric" aria-label="Quantity"><button type="button" data-q="1" data-id="' + s.id + '">+</button></div>' +
+        '<button class="btn auto" data-add="' + s.id + '">Add to cart</button></div>'
+      : '<div class="buyrow">' + (ME ? '<span class="muted">Only customer accounts can buy.</span>' :
+        '<div class="qty"><button type="button" data-q="-1" data-id="' + s.id + '">&minus;</button><input id="q' + s.id + '" value="1" inputmode="numeric" aria-label="Quantity"><button type="button" data-q="1" data-id="' + s.id + '">+</button></div>' +
+        '<button class="btn auto" data-add="' + s.id + '">Add to cart</button>') + '</div>';
+    return '<article class="card svc"><span class="badge cat">' + esc(s.category) + '</span><h3>' + esc(s.name) + '</h3><p>' + esc(s.description) + '</p>' +
+      '<div class="price">' + inr(s.price) + ' <small>/ ' + esc(s.unit) + '</small></div>' + buy + '</article>';
+  }).join('') || '<div class="empty">No services in this group.</div>';
+}
+function drawCats() {
+  var cats = ['All'].concat(SERVICES.map(function (s) { return s.category; }).filter(function (c, i, a) { return a.indexOf(c) === i; }));
+  $('cats').innerHTML = cats.map(function (c) { return '<button class="pill' + (c === CAT ? ' on' : '') + '" data-c="' + esc(c) + '">' + esc(c) + '</button>'; }).join('');
+}
+$('cats').addEventListener('click', function (e) { var b = e.target.closest('[data-c]'); if (!b) return; CAT = b.dataset.c; drawCats(); draw(); });
+$('grid').addEventListener('click', async function (e) {
+  var st = e.target.closest('[data-q]');
+  if (st) { var i = $('q' + st.dataset.id); i.value = Math.min(99, Math.max(1, (parseInt(i.value, 10) || 1) + parseInt(st.dataset.q, 10))); return; }
+  var ad = e.target.closest('[data-add]'); if (!ad) return;
+  var qty = Math.min(99, Math.max(1, parseInt($('q' + ad.dataset.add).value, 10) || 1));
+  if (!ME) {   // visitors must log in first; the choice is remembered and added after login
+    try { sessionStorage.setItem('nx_pending', JSON.stringify({ id: +ad.dataset.add, qty: qty })); } catch (x) {}
+    location.href = loginUrl('shop.html', 1); return;
+  }
+  ad.disabled = true;
+  var r = await call('cart_save.php', { action: 'add', service_id: +ad.dataset.add, qty: qty });
+  ad.disabled = false;
+  if (!r.ok) { toast(r.error, true); return; }
+  setCartBadge(r.count); toast('Added to your cart');
+});
+(async function () {
+  var me = await whoami();
+  if (me.ok && me.user) {
+    if (me.user.role === 'employee') { location.replace('dashboard.html'); return; }
+    ME = me.user; buildNav(me.user, me.cart_count);
+  } else {
+    buildPublicNav();
+    showMsg('note', 'You can look at everything. To add services to your cart and pay, please log in or create a customer account.', true);
+  }
+  var r = await call('services.php');
+  if (!r.ok) { showMsg('note', r.error); return; }
+  SERVICES = r.services; drawCats(); draw();
+  // A visitor who clicked "Add to cart" before logging in: add that service now.
+  var pend = null; try { pend = JSON.parse(sessionStorage.getItem('nx_pending') || 'null'); sessionStorage.removeItem('nx_pending'); } catch (x) {}
+  if (pend && ME && ME.role === 'customer') {
+    var a = await call('cart_save.php', { action: 'add', service_id: pend.id, qty: pend.qty });
+    if (a.ok) { setCartBadge(a.count); toast('Added to your cart. Open Cart when you are ready to pay.'); }
+  }
+})();
+</script></body></html>

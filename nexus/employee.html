@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>My workspace | Nexus Media Labs</title><link rel="stylesheet" href="assets/auth.css"></head>
+<body>
+<header class="top"><div class="in">
+  <a class="brand" href="index.html"><span class="mark">N</span><span>NEXUS<small>MEDIA LABS</small></span></a>
+  <nav id="nav"></nav>
+</div></header>
+<main class="wrap">
+  <h1 id="hello">My workspace</h1>
+  <p class="muted">Your employee profile, your track record, notices from the admin and a way to ask for information.</p>
+
+  <section class="card" style="margin-top:20px">
+    <div class="idcard">
+      <div class="av" id="av">E</div>
+      <div>
+        <h2 style="margin:0" id="nm"></h2>
+        <div style="margin:6px 0"><span class="idcode" id="code"></span> <span class="badge employee">Employee</span> <span class="badge active" id="st"></span></div>
+        <div class="muted" id="sub"></div>
+      </div>
+    </div>
+    <dl class="kv" id="kv" style="margin-top:16px"></dl>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px"><a class="btn auto" href="portfolio.html#add">+ Add work</a><a class="btn ghost auto" href="portfolio.html">Edit my portfolio</a><a class="btn ghost auto" href="view.html">Preview my portfolio</a></div>
+  </section>
+
+  <div class="grid g2" style="margin-top:20px;align-items:start">
+    <section class="card">
+      <h2>My track record</h2>
+      <div class="stats4" id="stats"></div>
+      <h3 style="margin:18px 0 0;font-size:1rem">Work so far</h3>
+      <ul class="tl" id="tl"></ul>
+    </section>
+    <section class="card">
+      <h2>Notice board</h2>
+      <div id="notices"><p class="muted">Loading...</p></div>
+    </section>
+  </div>
+
+  <section class="card" style="margin-top:20px">
+    <h2>Ask the admin</h2>
+    <p class="muted">Need information, a document, leave, access to something? Write it here. Only you and the admin can see your requests. Some company information is kept by the admin only, so the admin decides what to share.</p>
+    <div id="rMsg" class="alert"></div>
+    <form id="rf" novalidate>
+      <label for="rs">Subject</label><input id="rs" maxlength="120" placeholder="e.g. Need the brand guidelines for client X">
+      <label for="rm">Your question or request</label><textarea id="rm" maxlength="2000"></textarea>
+      <button class="btn auto" id="rGo" type="submit" style="margin-top:14px;width:auto">Send to admin</button>
+    </form>
+    <div id="reqs"></div>
+  </section>
+
+  <section class="card" style="margin-top:20px;max-width:520px">
+    <h2>Change password</h2>
+    <div id="msg" class="alert"></div>
+    <form id="f" novalidate>
+      <label for="cur">Current password</label><div class="pw"><input id="cur" type="password" autocomplete="current-password"><button type="button">Show</button></div>
+      <label for="nw">New password</label><div class="pw"><input id="nw" type="password" autocomplete="new-password" placeholder="8+ characters, letters and numbers"><button type="button">Show</button></div>
+      <button class="btn" id="go" type="submit">Update password</button>
+    </form>
+  </section>
+</main>
+<dialog id="viewer" class="viewer"></dialog>
+<script src="assets/auth.js"></script><script src="assets/shop.js"></script><script src="assets/portfolio.js"></script>
+<script>
+wirePwToggles();
+async function loadRequests() {
+  var r = await call('staff_requests.php');
+  if (!r.ok) { showMsg('rMsg', r.error); return; }
+  $('reqs').innerHTML = r.requests.length ? r.requests.map(function (q) {
+    return '<div class="reqitem"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>' + esc(q.subject) + '</b><span class="badge ' + (q.status === 'open' ? 'pending' : 'paid') + '">' + (q.status === 'open' ? 'waiting for admin' : 'answered') + '</span></div>' +
+      '<div class="muted">' + esc(fmtDate(q.created_at)) + '</div><p style="margin-top:6px">' + nl2br(q.message) + '</p>' +
+      (q.reply ? '<div class="reply"><div class="muted">Admin replied ' + esc(fmtDate(q.replied_at)) + '</div>' + nl2br(q.reply) + '</div>' : '') + '</div>';
+  }).join('') : '<p class="muted" style="margin-top:12px">You have not sent any request yet.</p>';
+}
+(async function () {
+  var me = await guard(['employee']); if (!me) return;
+  var u = me.user;
+  var r = await call('portfolio.php');
+  if (!r.ok) { showMsg('msg', r.error); return; }
+  var o = r.owner, p = r.profile, rec = r.record;
+  $('hello').textContent = 'Hello, ' + u.name.split(' ')[0];
+  $('av').textContent = u.name.trim().charAt(0).toUpperCase(); $('nm').textContent = u.name; $('code').textContent = o.code; $('st').textContent = o.status;
+  $('sub').textContent = [o.designation, o.department].filter(Boolean).join(' · ') || 'Your designation and department will appear here once the admin adds them.';
+  $('kv').innerHTML = '<dt>Employee ID</dt><dd>' + esc(o.code) + '</dd><dt>Email</dt><dd>' + esc(o.email) + '</dd><dt>Phone</dt><dd>' + esc(p.phone || 'Not added yet (add it in your portfolio)') + '</dd>' +
+    '<dt>Designation</dt><dd>' + esc(o.designation || '-') + '</dd><dt>Department</dt><dd>' + esc(o.department || '-') + '</dd>' +
+    '<dt>Joined</dt><dd>' + esc(fmtDay(o.joined.slice(0, 10))) + ' (' + rec.days_with_us + ' days ago)</dd><dt>Last login</dt><dd>' + esc(fmtDate(u.last_login)) + '</dd>';
+  var cats = Object.keys(rec.categories).map(function (k) { return k + ' (' + rec.categories[k] + ')'; }).join(', ');
+  $('stats').innerHTML = '<div><b>' + rec.works + '</b><span class="muted">Work items</span></div><div><b>' + rec.files + '</b><span class="muted">Files</span></div><div><b>' + Object.keys(rec.categories).length + '</b><span class="muted">Categories</span></div><div><b>' + (rec.last_work ? esc(fmtDay(rec.last_work)) : '-') + '</b><span class="muted">Latest work</span></div>';
+  $('tl').innerHTML = r.works.length ? r.works.map(function (w) {
+    return '<li><span class="muted">' + esc(fmtDay(w.work_date || w.created_at.slice(0, 10))) + ' · ' + esc(w.category) + '</span><br><a href="portfolio.html">' + esc(w.title) + '</a>' + (w.files.length ? ' <span class="muted">· ' + w.files.length + ' file(s)</span>' : '') + '</li>';
+  }).join('') : '<li class="muted">No work added yet. Press <b>+ Add work</b> to start your record.</li>';
+  var n = await call('notices.php');
+  $('notices').innerHTML = n.ok && n.notices.length ? n.notices.map(function (x) {
+    return '<div class="reqitem" style="margin-top:0;margin-bottom:10px"><b>' + esc(x.title) + '</b><div class="muted">' + esc(fmtDate(x.created_at)) + (x.author ? ' · ' + esc(x.author) : '') + '</div><p style="margin-top:6px">' + nl2br(x.body) + '</p></div>';
+  }).join('') : '<p class="muted">No notices right now.</p>';
+  loadRequests();
+})();
+$('rf').addEventListener('submit', async function (e) {
+  e.preventDefault(); showMsg('rMsg', '');
+  $('rGo').disabled = true; var r = await call('staff_requests.php', { action: 'create', subject: $('rs').value, message: $('rm').value }); $('rGo').disabled = false;
+  if (!r.ok) { showMsg('rMsg', r.error); return; }
+  $('rf').reset(); showMsg('rMsg', 'Sent. The admin will reply here.', true); loadRequests();
+});
+$('f').addEventListener('submit', async function (e) {
+  e.preventDefault(); showMsg('msg', '');
+  if (!$('cur').value || !$('nw').value) { showMsg('msg', 'Fill in both password fields.'); return; }
+  $('go').disabled = true; var r = await call('change_password.php', { current: $('cur').value, new: $('nw').value }); $('go').disabled = false;
+  if (!r.ok) { showMsg('msg', r.error); return; }
+  $('f').reset(); showMsg('msg', 'Password updated.', true);
+});
+</script></body></html>

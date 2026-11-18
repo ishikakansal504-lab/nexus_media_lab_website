@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Login | Nexus Media Labs</title><link rel="stylesheet" href="assets/auth.css"></head>
+<body class="auth-body"><main class="auth-card">
+  <a class="brand" href="index.html"><span class="mark">N</span><span>NEXUS<small>MEDIA LABS</small></span></a>
+  <h1>Welcome back</h1>
+  <div class="tabs" id="tabs" role="tablist">
+    <button type="button" data-t="customer" class="on">Customer</button>
+    <button type="button" data-t="employee">Employee</button>
+    <button type="button" data-t="admin">Admin</button>
+  </div>
+  <p class="tabnote" id="tnote"></p>
+  <div id="msg" class="alert"></div>
+  <form id="f" novalidate>
+    <label for="email" id="lbl">Email</label>
+    <input id="email" autocomplete="username" placeholder="you@example.com" required>
+    <label for="pw">Password</label>
+    <div class="pw"><input id="pw" type="password" autocomplete="current-password" placeholder="Your password" required><button type="button">Show</button></div>
+    <button class="btn" id="go" type="submit">Log in</button>
+  </form>
+  <div class="links"><a href="index.html">← Back to website</a><a id="su" href="signup.html">Create an account</a></div>
+</main>
+<script src="assets/auth.js"></script>
+<script>
+wirePwToggles();
+var TAB = 'customer';
+var TABS = {
+  customer: ['Email', 'you@example.com', 'Buy our services, follow your orders and see what you bought earlier.'],
+  employee: ['Employee ID or email', 'EMP-0007 or you@example.com', 'For our team. Use the employee ID the admin gave you (like EMP-0007) or your email.'],
+  admin: ['Email', 'admin@example.com', 'For administrators only. Admin access is given by the main admin.']
+};
+function setTab(t) {
+  TAB = t; var d = TABS[t];
+  [].forEach.call($('tabs').children, function (b) { b.className = b.dataset.t === t ? 'on' : ''; });
+  $('lbl').textContent = d[0]; $('email').placeholder = d[1]; $('tnote').textContent = d[2];
+  $('email').type = t === 'employee' ? 'text' : 'email';
+  $('su').style.display = (t === 'admin' || !SIGNUP) ? 'none' : '';
+  showMsg('msg', '');
+}
+var SIGNUP = true;
+$('tabs').addEventListener('click', function (e) { var b = e.target.closest('button[data-t]'); if (b) setTab(b.dataset.t); });
+function nextOk() { var m = /[?&]next=((?:shop|cart|orders)\.html)(?:&|$)/.exec(location.search); return m ? m[1] : ''; }
+function dest(user, fallback) { return user && user.role === 'customer' && nextOk() ? nextOk() : fallback; }
+(async function () {
+  var me = await whoami();
+  if (!me.ok) { showMsg('msg', me.error); return; }
+  if (me.user) { location.replace(dest(me.user, { admin: 'admin.html', employee: 'employee.html', customer: 'dashboard.html' }[me.user.role])); return; }
+  SIGNUP = !!me.signup;
+  var as = /[?&]as=(employee|admin)/.exec(location.search); setTab(as ? as[1] : 'customer');
+  if (nextOk()) $('su').href = 'signup.html?next=' + nextOk();
+  if (location.search.indexOf('registered=1') > -1) showMsg('msg', 'Account created. ' + (/[?&]req=(employee|admin)/.test(location.search) ? 'Your ' + /[?&]req=(employee|admin)/.exec(location.search)[1] + ' request has been sent for approval. Until it is approved, log in on the Customer tab.' : 'You can log in now.'), true);
+  else if (location.search.indexOf('need=1') > -1) showMsg('msg', 'Please log in or create a free customer account to add services to your cart and pay.', true);
+})();
+$('f').addEventListener('submit', async function (e) {
+  e.preventDefault(); showMsg('msg', '');
+  var id = $('email').value.trim(), pw = $('pw').value;
+  if (!id || !pw) { showMsg('msg', 'Enter your ' + (TAB === 'employee' ? 'employee ID or email' : 'email') + ' and password.'); return; }
+  $('go').disabled = true;
+  var r = await call('login.php', { login: id, password: pw, portal: TAB });
+  $('go').disabled = false;
+  if (!r.ok) { showMsg('msg', r.error); return; }
+  location.href = dest(r.user, r.redirect);
+});
+</script></body></html>

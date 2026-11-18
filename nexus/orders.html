@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>My orders | Nexus Media Labs</title><link rel="stylesheet" href="assets/auth.css"></head>
+<body>
+<header class="top"><div class="in">
+  <a class="brand" href="index.html"><span class="mark">N</span><span>NEXUS<small>MEDIA LABS</small></span></a>
+  <nav id="nav"></nav>
+</div></header>
+<main class="wrap">
+  <div class="page-h"><div><h1>My orders</h1><p class="muted">Everything you bought earlier.</p></div><a class="btn auto" href="shop.html">Buy more services</a></div>
+  <div class="grid g3" style="margin-top:18px">
+    <div class="card stat"><b id="sN">0</b><span class="muted">Purchases</span></div>
+    <div class="card stat"><b id="sT">0</b><span class="muted">Total spent</span></div>
+    <div class="card stat"><b id="sL">-</b><span class="muted">Last purchase</span></div>
+  </div>
+  <div class="filters">
+    <label style="margin:0;align-self:center">From</label><input type="date" id="from"><label style="margin:0;align-self:center">To</label><input type="date" id="to">
+    <button class="btn ghost sm" id="clr" type="button">Show all</button>
+  </div>
+  <div id="msg" class="alert"></div>
+  <div id="list"></div>
+</main>
+<script src="assets/auth.js"></script><script src="assets/shop.js"></script>
+<script>
+var ORDERS = [];
+function emiLine(o) { return o.payment_method === 'emi' ? '<span class="muted">EMI: ' + inr(o.emi_monthly) + ' a month for ' + o.emi_months + ' months (interest ' + inr(o.interest) + ')</span>' : ''; }
+function draw(r) {
+  $('sN').textContent = r.stats.orders; $('sT').textContent = inr(r.stats.total);
+  $('sL').textContent = r.orders.length ? new Date(r.orders[0].created_at.replace(' ', 'T')).toLocaleDateString([], { dateStyle: 'medium' }) : '-';
+  $('list').innerHTML = r.orders.length ? r.orders.map(function (o) {
+    var rows = o.items.map(function (i) { return '<tr><td>' + esc(i.name) + '</td><td class="num">' + inr(i.unit_price) + '</td><td class="num">' + i.qty + '</td><td class="num">' + inr(i.line_total) + '</td></tr>'; }).join('');
+    var canCancel = o.status === 'placed' && o.payment_status === 'pending';
+    return '<article class="card order"><div class="top2"><div><b>' + esc(o.order_no) + '</b> <span class="muted">&middot; ' + esc(fmtDate(o.created_at)) + '</span></div>' +
+      '<div><span class="badge ' + o.status + '">' + o.status + '</span> ' + (o.payment_status === 'paid' ? '<span class="okline">' + tickHtml('ok', true) + ' Payment done</span>' : '<span class="badge ' + o.payment_status + '">payment ' + o.payment_status + '</span>') + '</div></div>' +
+      '<div class="tbl"><table><thead><tr><th>Service</th><th class="num">Price</th><th class="num">Qty</th><th class="num">Total</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<div class="top2"><div><span class="muted">Paid by:</span> <b>' + esc(o.payment_label) + '</b> ' + emiLine(o) + '<br><span class="muted">Deliver to: ' + esc([o.address_line, o.city, o.state].filter(Boolean).join(', ') + (o.pincode ? ' - ' + o.pincode : '')) + ' &middot; +91 ' + esc(o.customer_phone) + '</span>' + (o.note ? '<br><span class="muted">Your note: ' + esc(o.note) + '</span>' : '') + '</div><div class="price">' + inr(o.total) + '</div></div>' +
+      '<div class="acts" style="display:flex;gap:8px"><button class="btn ghost sm" data-re="' + o.id + '">Order again</button>' + (canCancel ? '<button class="btn danger sm" data-cx="' + o.id + '">Cancel order</button>' : '') + '</div></article>';
+  }).join('') : '<div class="empty">No orders yet. <a href="shop.html">Browse the services</a>.</div>';
+}
+async function load() {
+  var q = []; if ($('from').value) q.push('from=' + $('from').value); if ($('to').value) q.push('to=' + $('to').value);
+  var r = await call('orders.php' + (q.length ? '?' + q.join('&') : ''));
+  if (!r.ok) { showMsg('msg', r.error); return; }
+  ORDERS = r.orders; draw(r);
+}
+$('from').onchange = $('to').onchange = load;
+$('clr').onclick = function () { $('from').value = ''; $('to').value = ''; load(); };
+$('list').addEventListener('click', async function (e) {
+  var re = e.target.closest('[data-re]'), cx = e.target.closest('[data-cx]');
+  if (cx) {
+    if (!confirm('Cancel this order?')) return;
+    var r = await call('order_cancel.php', { id: +cx.dataset.cx });
+    if (!r.ok) { showMsg('msg', r.error); return; } toast('Order cancelled'); load(); return;
+  }
+  if (re) {
+    var o = ORDERS.filter(function (x) { return x.id === +re.dataset.re; })[0], sv = await call('services.php');
+    var ok = 0, skip = 0;
+    for (var i = 0; i < o.items.length; i++) {
+      var m = (sv.services || []).filter(function (s) { return s.name === o.items[i].name; })[0];
+      if (!m) { skip++; continue; }
+      var a = await call('cart_save.php', { action: 'add', service_id: m.id, qty: o.items[i].qty }); if (a.ok) ok++; else skip++;
+    }
+    if (ok) { toast(ok + ' item(s) added to your cart' + (skip ? ' (' + skip + ' no longer sold)' : '')); setTimeout(function () { location.href = 'cart.html'; }, 700); }
+    else toast('Those services are no longer available.', true);
+  }
+});
+(async function () { if (await guard(['customer'])) load(); })();
+</script></body></html>

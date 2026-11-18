@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>My portfolio | Nexus Media Labs</title><link rel="stylesheet" href="assets/auth.css"></head>
+<body>
+<header class="top"><div class="in">
+  <a class="brand" href="index.html"><span class="mark">N</span><span>NEXUS<small>MEDIA LABS</small></span></a>
+  <nav><a href="index.html">Website</a><a href="employee.html">My workspace</a><a href="view.html">Preview</a><button class="btn ghost sm" onclick="doLogout()">Log out</button></nav>
+</div></header>
+<main class="wrap">
+  <h1>My portfolio</h1>
+  <p class="muted">Tell people about yourself and upload your work. You can change everything later. The admin can see your portfolio.</p>
+
+  <section class="card sec">
+    <h2>About me</h2>
+    <div id="pMsg" class="alert"></div>
+    <form id="pForm" novalidate>
+      <div class="two">
+        <div><label for="headline">Headline</label><input id="headline" maxlength="120" placeholder="e.g. Digital marketing intern | Content creator"></div>
+        <div><label for="location">Location</label><input id="location" maxlength="100" placeholder="City, Country"></div>
+      </div>
+      <label for="bio">About you</label><textarea id="bio" maxlength="2000" placeholder="A short introduction: who you are, what you do, what you want to do next."></textarea>
+      <div class="two">
+        <div><label for="phone">Phone</label><input id="phone" maxlength="30" placeholder="Optional"></div>
+        <div><label for="skills">Skills</label><input id="skills" maxlength="500" placeholder="SEO, Reels, Python, Excel"><div class="hint">Separate with commas.</div></div>
+      </div>
+      <label for="education">Education</label><textarea id="education" maxlength="2000" placeholder="Course, college, years, marks"></textarea>
+      <label for="experience">Experience</label><textarea id="experience" maxlength="2000" placeholder="Internships, jobs, societies, events"></textarea>
+      <div class="two">
+        <div><label for="linkedin">LinkedIn link</label><input id="linkedin" type="url" placeholder="https://www.linkedin.com/in/..."></div>
+        <div><label for="github">GitHub link</label><input id="github" type="url" placeholder="https://github.com/..."></div>
+      </div>
+      <label for="website">Website / blog link</label><input id="website" type="url" placeholder="https://...">
+      <div style="margin-top:20px"><button class="btn auto" id="pGo" type="submit">Save my information</button></div>
+    </form>
+  </section>
+
+  <div class="page-h sec"><div><h2 style="margin:0">My work</h2><p class="muted">Projects, reels, designs, blogs, certificates. Add files or links.</p></div>
+    <button class="btn auto" id="addBtn">+ Add work</button></div>
+  <div id="wMsg" class="alert"></div>
+  <div id="list" class="works"></div>
+</main>
+
+<dialog id="dlg" class="wide">
+  <h2 id="dlgT">Add work</h2>
+  <div id="dMsg" class="alert"></div>
+  <form id="wForm" novalidate>
+    <input type="hidden" id="wid" value="0">
+    <label for="wt">Title</label><input id="wt" maxlength="120" placeholder="e.g. Instagram reels for July">
+    <div class="two">
+      <div><label for="wc">Category</label><select id="wc"></select></div>
+      <div><label for="wd">Date</label><input id="wd" type="date"></div>
+    </div>
+    <label for="wdesc">Description</label><textarea id="wdesc" maxlength="5000" placeholder="What did you do? What was the result? Which tools did you use?"></textarea>
+    <label for="wl">Link (optional)</label><input id="wl" type="url" placeholder="https://... (Instagram post, blog, GitHub, Google Drive)">
+    <label for="wf">Files (optional)</label><input id="wf" type="file" multiple>
+    <div class="hint" id="wHint"></div>
+    <div id="oldFiles" class="old"></div>
+    <div style="display:flex;gap:10px;margin-top:20px"><button class="btn ghost" type="button" id="dNo">Cancel</button><button class="btn" id="dGo" type="submit">Save work</button></div>
+  </form>
+</dialog>
+
+<script src="assets/auth.js"></script><script src="assets/portfolio.js"></script>
+<script>
+var DATA = null, WORKS = [];
+var PF = ['headline','bio','location','phone','skills','education','experience','linkedin','github','website'];
+
+async function load() {
+  var r = await call('portfolio.php');
+  if (!r.ok) { if (r.error && /log in/i.test(r.error)) { location.replace('login.html'); return; } showMsg('wMsg', r.error); return; }
+  DATA = r; WORKS = r.works;
+  PF.forEach(function (k) { $(k).value = r.profile[k] || ''; });
+  $('wc').innerHTML = r.categories.map(function (c) { return '<option>' + esc(c) + '</option>'; }).join('');
+  $('wf').accept = r.limits.types.map(function (t) { return '.' + t; }).join(',');
+  $('wHint').textContent = 'Up to ' + r.limits.max_files + ' files, ' + r.limits.max_file_mb + ' MB each. Allowed: ' + r.limits.types.join(', ') + '.';
+  draw();
+  if (location.hash === '#add') { history.replaceState(null, '', 'portfolio.html'); openDlg(null); }
+}
+function draw() {
+  $('list').innerHTML = WORKS.length ? WORKS.map(function (w) { return workCard(w, { actions: true }); }).join('') :
+    '<div class="empty" style="grid-column:1/-1">You have not added any work yet. Click <b>+ Add work</b> to start.</div>';
+}
+
+$('pForm').addEventListener('submit', async function (e) {
+  e.preventDefault(); showMsg('pMsg', '');
+  var d = {}; PF.forEach(function (k) { d[k] = $(k).value; });
+  $('pGo').disabled = true;
+  var r = await call('profile_save.php', d);
+  $('pGo').disabled = false;
+  showMsg('pMsg', r.ok ? 'Saved.' : r.error, r.ok);
+});
+
+function openDlg(w) {
+  showMsg('dMsg', '');
+  $('dlgT').textContent = w ? 'Edit work' : 'Add work';
+  $('wid').value = w ? w.id : 0;
+  $('wt').value = w ? w.title : ''; $('wc').value = w ? w.category : DATA.categories[0];
+  $('wd').value = w && w.work_date ? w.work_date : ''; $('wdesc').value = w ? w.description : '';
+  $('wl').value = w ? w.link_url : ''; $('wf').value = '';
+  $('oldFiles').innerHTML = w && w.files.length ? '<div class="hint">Current files (tick to remove):</div>' + w.files.map(function (f) {
+    return '<label><input type="checkbox" value="' + f.id + '"> ' + KIND_ICON[f.kind] + ' ' + esc(f.name) + ' <span class="muted">(' + fmtSize(f.size) + ')</span></label>';
+  }).join('') : '';
+  $('dlg').showModal();
+}
+$('addBtn').onclick = function () { openDlg(null); };
+$('dNo').onclick = function () { $('dlg').close(); };
+
+$('list').addEventListener('click', async function (e) {
+  var b = e.target.closest('button[data-a]'); if (!b) return;
+  var id = +b.dataset.id, w = WORKS.filter(function (x) { return x.id === id; })[0];
+  if (b.dataset.a === 'edit') { openDlg(w); return; }
+  if (!confirm('Delete "' + w.title + '" and its files? This cannot be undone.')) return;
+  var r = await call('work_delete.php', { id: id });
+  if (!r.ok) { showMsg('wMsg', r.error); return; }
+  showMsg('wMsg', 'Work deleted.', true); load();
+});
+
+$('wForm').addEventListener('submit', async function (e) {
+  e.preventDefault(); showMsg('dMsg', '');
+  if ($('wt').value.trim().length < 2) { showMsg('dMsg', 'Give your work a title.'); return; }
+  var fd = new FormData();
+  fd.append('id', $('wid').value); fd.append('title', $('wt').value); fd.append('category', $('wc').value);
+  fd.append('work_date', $('wd').value); fd.append('description', $('wdesc').value); fd.append('link_url', $('wl').value);
+  var rm = [].slice.call($('oldFiles').querySelectorAll('input:checked')).map(function (i) { return i.value; });
+  fd.append('remove', rm.join(','));
+  [].forEach.call($('wf').files, function (f) { fd.append('files[]', f); });
+  $('dGo').disabled = true; $('dGo').textContent = 'Saving...';
+  var r = await callForm('work_save.php', fd);
+  $('dGo').disabled = false; $('dGo').textContent = 'Save work';
+  if (!r.ok) { showMsg('dMsg', r.error); return; }
+  $('dlg').close(); showMsg('wMsg', 'Work saved.', true); load();
+});
+
+(async function () {
+  var me = await whoami();
+  if (!me.ok || !me.user) { location.replace('login.html?as=employee'); return; }
+  if (me.user.role === 'customer') { location.replace('dashboard.html'); return; }
+  load();
+})();
+</script></body></html>

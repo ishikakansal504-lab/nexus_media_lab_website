@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Create account | Nexus Media Labs</title><link rel="stylesheet" href="assets/auth.css"></head>
+<body class="auth-body"><main class="auth-card">
+  <a class="brand" href="index.html"><span class="mark">N</span><span>NEXUS<small>MEDIA LABS</small></span></a>
+  <h1>Create your account</h1>
+  <p class="muted">It takes less than a minute. Choose what you need:</p>
+  <div id="msg" class="alert"></div>
+  <form id="f" novalidate>
+    <label class="choice sel"><input type="radio" name="at" value="customer" checked><div><b>Customer</b><span>Buy our services, keep a cart, see your earlier orders. Ready at once.</span></div></label>
+    <label class="choice"><input type="radio" name="at" value="employee"><div><b>Employee</b><span>For our team. The admin must approve you first; until then you are a customer.</span></div></label>
+    <label class="choice"><input type="radio" name="at" value="admin"><div><b>Admin</b><span>The main admin must give you permission first; until then you are a customer.</span></div></label>
+    <label for="name">Full name</label><input id="name" autocomplete="name" placeholder="Your name" required>
+    <label for="email">Email</label><input id="email" type="email" autocomplete="username" placeholder="you@example.com" required>
+    <label for="pw">Password</label>
+    <div class="pw"><input id="pw" type="password" autocomplete="new-password" placeholder="8+ characters, letters and numbers" required><button type="button">Show</button></div>
+    <label for="pw2">Confirm password</label>
+    <div class="pw"><input id="pw2" type="password" autocomplete="new-password" placeholder="Type the password again" required><button type="button">Show</button></div>
+    <button class="btn" id="go" type="submit">Create account</button>
+  </form>
+  <div class="links"><a href="index.html">← Back to website</a><a href="login.html">I already have an account</a></div>
+</main>
+<script src="assets/auth.js"></script>
+<script>
+wirePwToggles();
+function nextOk() { var m = /[?&]next=((?:shop|cart|orders)\.html)(?:&|$)/.exec(location.search); return m ? '&next=' + m[1] : ''; }
+(async function () {
+  var me = await whoami();
+  if (!me.ok) { showMsg('msg', me.error); return; }
+  if (me.user) { location.replace(me.user.role === 'admin' ? 'admin.html' : 'dashboard.html'); return; }
+  var lk = document.querySelector('.links a[href="login.html"]'); if (lk && nextOk()) lk.href = 'login.html?' + nextOk().slice(1);
+  if (!me.signup) { $('f').style.display = 'none'; showMsg('msg', 'Sign-up is closed. Please ask the admin to create your account.'); }
+})();
+document.querySelectorAll('.choice input').forEach(function (i) { i.addEventListener('change', function () { document.querySelectorAll('.choice').forEach(function (c) { c.classList.toggle('sel', c.querySelector('input').checked); }); }); });
+$('f').addEventListener('submit', async function (e) {
+  e.preventDefault(); showMsg('msg', '');
+  var name = $('name').value.trim(), email = $('email').value.trim(), pw = $('pw').value;
+  if (!name || !email || !pw) { showMsg('msg', 'Please fill in all fields.'); return; }
+  if (pw !== $('pw2').value) { showMsg('msg', 'The two passwords do not match.'); return; }
+  $('go').disabled = true;
+  var at = document.querySelector('input[name=at]:checked').value;
+  var r = await call('register.php', { name: name, email: email, password: pw, account_type: at });
+  $('go').disabled = false;
+  if (!r.ok) { showMsg('msg', r.error); return; }
+  location.href = 'login.html?registered=1' + nextOk() + (r.requested ? '&req=' + r.requested : '');
+});
+</script></body></html>

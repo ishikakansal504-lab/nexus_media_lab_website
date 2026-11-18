@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Settings | Nexus Media Labs</title><link rel="stylesheet" href="assets/auth.css"></head>
+<body>
+<header class="top"><div class="in">
+  <a class="brand" href="index.html"><span class="mark">N</span><span>NEXUS<small>MEDIA LABS</small></span></a>
+  <nav id="nav"></nav>
+</div></header>
+<main class="wrap">
+  <h1>Payment settings</h1>
+  <p class="muted">Decide how customers can pay. You can change all of this at any time.</p>
+  <div id="msg" class="alert"></div>
+  <form id="f" novalidate>
+    <div class="grid g2" style="margin-top:18px">
+      <section class="card">
+        <h2>Payment methods</h2>
+        <label class="switch"><input type="checkbox" id="pay_cod"> Cash on delivery</label>
+        <label class="switch"><input type="checkbox" id="pay_emi"> EMI (monthly instalments)</label>
+        <label class="switch"><input type="checkbox" id="pay_online"> Online (scan and pay)</label>
+        <p class="hint">Online payment appears at checkout only when you have added a scanner (QR) or a UPI ID below.</p>
+        <label class="switch" style="margin-top:12px"><input type="checkbox" id="online_auto"> Demonstration: treat the transaction number as proof of payment</label>
+        <p class="hint" style="margin-left:26px">Keep this OFF for real business. When ON, an online order turns &quot;paid&quot; (green tick) the moment the customer types any transaction number, without you checking your bank. Useful only for a classroom demonstration.</p>
+      </section>
+      <section class="card">
+        <h2>EMI</h2>
+        <div class="two"><div><label for="emi_rate">Interest (% a year)</label><input id="emi_rate" type="number" min="0" max="60" step="0.01"><div class="hint">0 means no extra interest.</div></div>
+          <div><label for="emi_min">Smallest order for EMI (&#8377;)</label><input id="emi_min" type="number" min="0" step="1"></div></div>
+        <label for="emi_months">Months offered</label><input id="emi_months" placeholder="3,6,9,12">
+        <div class="hint">Separate the numbers with commas (2 to 36 months).</div>
+      </section>
+    </div>
+
+    <section class="card" style="margin-top:18px">
+      <h2>Your payment scanner (QR code)</h2>
+      <p class="muted">Customers who choose &quot;Online&quot; see this picture and your UPI ID. Upload your own scanner whenever you are ready, and replace or remove it later.</p>
+      <div class="grid g2" style="align-items:start">
+        <div>
+          <div id="qrBox" class="paybox" style="margin-top:0"><span class="muted">No scanner added yet.</span></div>
+          <label class="switch" id="rmRow" style="display:none"><input type="checkbox" id="remove_qr"> Remove the current scanner</label>
+        </div>
+        <div>
+          <label for="qr">Upload a new scanner picture</label><input id="qr" type="file" accept="image/png,image/jpeg,image/webp">
+          <div class="hint">PNG, JPG or WebP, up to 2 MB. A new picture replaces the old one.</div>
+          <label for="upi_id">UPI ID</label><input id="upi_id" maxlength="105" placeholder="yourname@bank">
+          <label for="qr_note">Message shown to customers (optional)</label><input id="qr_note" maxlength="200" placeholder="For example: Pay to Nexus Media Labs and keep the screenshot">
+        </div>
+      </div>
+    </section>
+    <section class="card" style="margin-top:18px">
+      <h2>Automatic email to customers</h2>
+      <div id="mailState" class="alert"></div>
+      <p class="muted">When an order is placed, and again when payment is confirmed, the customer gets an email from your business email, and you get a copy. For Gmail: turn on 2-step verification on the Google account, then Google Account &gt; Security &gt; App passwords, create one and paste the 16 letters below (never your normal Gmail password).</p>
+      <div class="grid g2">
+        <div><label for="smtp_host">Mail server</label><input id="smtp_host" placeholder="smtp.gmail.com">
+          <div class="two"><div><label for="smtp_port">Port</label><input id="smtp_port" type="number" placeholder="587"></div><div><label for="smtp_secure">Security</label><select id="smtp_secure"><option value="tls">TLS (587)</option><option value="ssl">SSL (465)</option><option value="none">None</option></select></div></div></div>
+        <div><label for="smtp_user">Your email (username)</label><input id="smtp_user" placeholder="ishikakansal504@gmail.com">
+          <label for="smtp_pass">App password</label><input id="smtp_pass" type="password" autocomplete="new-password" placeholder="" ><div class="hint" id="passHint">Leave blank to keep the saved one.</div>
+          <label for="smtp_from">Send from (optional)</label><input id="smtp_from" placeholder="Same as your email"></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center"><button class="btn ghost auto" type="button" id="tEmail">Save, then send me a test email</button><span class="muted" id="tEmailR"></span></div>
+    </section>
+
+    <section class="card" style="margin-top:18px">
+      <h2>Automatic WhatsApp to customers</h2>
+      <div id="waState" class="alert"></div>
+      <p class="muted">WhatsApp only allows a website to message customers through the <b>WhatsApp Business Cloud API</b> (a free Meta business account). Steps: 1) create an app at developers.facebook.com and add WhatsApp; 2) note the <b>Phone number ID</b> and create a permanent <b>access token</b>; 3) create a message template (category Utility) named for example <code>order_confirmation</code> with this body: <i>Hello {{1}}, your order {{2}} at Nexus Media Labs is received. Total {{3}}. Status: {{4}}.</i> and wait for Meta to approve it; 4) paste the three values below. In Meta's free test mode only numbers you add as recipients receive messages.</p>
+      <div class="grid g2">
+        <div><label for="wa_phone_id">Phone number ID</label><input id="wa_phone_id" inputmode="numeric" placeholder="e.g. 109876543210987">
+          <label for="wa_token">Access token</label><input id="wa_token" type="password" autocomplete="new-password"><div class="hint" id="tokHint">Leave blank to keep the saved one.</div></div>
+        <div><label for="wa_template">Template name</label><input id="wa_template" placeholder="order_confirmation">
+          <label for="wa_lang">Template language</label><input id="wa_lang" placeholder="en" maxlength="8"></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center"><input id="tPhone" inputmode="numeric" maxlength="14" placeholder="Mobile number for the test" style="max-width:230px"><button class="btn ghost auto" type="button" id="tWa">Save, then send a test WhatsApp</button><span class="muted" id="tWaR"></span></div>
+    </section>
+    <button class="btn auto" id="go" type="submit" style="margin-top:18px">Save settings</button>
+  </form>
+
+  <section class="card" style="margin-top:26px">
+    <h2>Messages sent to customers</h2>
+    <p class="muted">Every automatic email and WhatsApp message is listed here with its result, so you can see what went out. Customers also get a "Message us on WhatsApp" button, and each order has a "Send WhatsApp confirmation" button for a manual copy.</p>
+    <div class="tbl" style="margin-top:12px"><table style="min-width:640px"><thead><tr><th>When</th><th>To</th><th>Message</th><th>Result</th></tr></thead><tbody id="msgs"></tbody></table></div>
+  </section>
+
+  <section class="card" style="margin-top:26px">
+    <h2>Sample data for a demonstration</h2>
+    <p class="muted">Adds sample customers, about 95 sample orders over the last year and some expenses, so the reports and charts have something to show. Everything added is marked &quot;sample&quot; and can be removed with one click. Your real orders and customers are never touched.</p>
+    <div id="dMsg" class="alert"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><button class="btn ghost auto" id="dLoad" type="button">Add sample data</button><button class="btn danger auto" id="dDel" type="button">Remove sample data</button><span class="muted" id="dCount"></span></div>
+  </section>
+</main>
+<script src="assets/auth.js"></script><script src="assets/shop.js"></script>
+<script>
+function fill(f) {
+  ['pay_cod', 'pay_emi', 'pay_online', 'online_auto'].forEach(function (k) { $(k).checked = f[k]; });
+  $('emi_rate').value = f.emi_rate; $('emi_min').value = f.emi_min; $('emi_months').value = f.emi_months; $('upi_id').value = f.upi_id; $('qr_note').value = f.qr_note;
+  $('qrBox').innerHTML = f.has_qr ? '<img class="qrimg" alt="Your payment scanner" src="api/qr.php?t=' + Date.now() + '">' : '<span class="muted">No scanner added yet.</span>';
+  $('rmRow').style.display = f.has_qr ? '' : 'none'; $('remove_qr').checked = false;
+}
+async function load() {
+  var r = await call('settings.php');
+  if (!r.ok) { showMsg('msg', r.error); return; }
+  fill(r.form);
+  ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_from', 'wa_phone_id', 'wa_template', 'wa_lang'].forEach(function (k) { $(k).value = r.form[k] || ''; });
+  $('smtp_secure').value = r.form.smtp_secure || 'tls'; $('smtp_pass').value = ''; $('wa_token').value = '';
+  $('passHint').textContent = r.form.has_smtp_pass ? 'A password is saved. Leave blank to keep it.' : 'No password saved yet.';
+  $('tokHint').textContent = r.form.has_wa_token ? 'A token is saved. Leave blank to keep it.' : 'No token saved yet.';
+  if (!$('tPhone').value) $('tPhone').value = r.business_phone;
+  if (r.email_ready) showMsg('mailState', 'Email is switched on. Customers get a confirmation automatically, and you get a copy at ' + r.business_email + '.', true);
+  else showMsg('mailState', 'Email is not set up yet, so no email is being sent. Fill in the boxes below. Orders still work meanwhile.');
+  if (r.wa_ready) showMsg('waState', 'WhatsApp is switched on. Customers get a WhatsApp message automatically.', true);
+  else showMsg('waState', 'WhatsApp is not set up yet. Customers can still use the "Message us on WhatsApp" button.');
+  $('msgs').innerHTML = r.messages.map(function (m) {
+    return '<tr class="msgrow"><td>' + esc(fmtDate(m.created_at)) + '</td><td>' + (m.channel === 'whatsapp' ? '&#128222; ' : '&#9993; ') + esc(m.to_addr) + '<br><span class="muted">' + (m.kind === 'test' ? 'test' : m.kind === 'admin-copy' ? 'copy for you' : m.kind === 'paid' ? 'payment received' : 'order confirmation') + '</span></td><td>' + esc(m.subject) + '</td><td><span class="badge ' + (m.status === 'sent' ? 'paid' : m.status === 'failed' ? 'cancelled' : 'pending') + '">' + (m.status === 'not_configured' ? 'not sent' : m.status) + '</span>' + (m.error ? '<br><span class="muted">' + esc(m.error) + '</span>' : '') + '</td></tr>';
+  }).join('') || '<tr><td colspan="4" class="muted">No messages yet.</td></tr>'; $('dCount').textContent = r.demo_orders ? r.demo_orders + ' sample orders are loaded.' : 'No sample data is loaded.';
+}
+async function saveAll() {
+  var fd = new FormData();
+  ['pay_cod', 'pay_emi', 'pay_online', 'online_auto', 'remove_qr'].forEach(function (k) { fd.append(k, $(k).checked ? '1' : '0'); });
+  ['emi_rate', 'emi_min', 'emi_months', 'upi_id', 'qr_note', 'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'smtp_from', 'wa_phone_id', 'wa_token', 'wa_template', 'wa_lang'].forEach(function (k) { fd.append(k, $(k).value.trim()); });
+  return callForm('settings_save.php', fd);
+}
+async function testMsg(channel, btn, out) {
+  $(out).textContent = 'Saving and sending...'; btn.disabled = true;
+  var s = await saveAll(); if (!s.ok) { $(out).textContent = s.error; btn.disabled = false; return; }
+  var r = await call('notify_test.php', { channel: channel, phone: $('tPhone').value });
+  btn.disabled = false;
+  $(out).textContent = r.ok ? (channel === 'email' ? 'Sent! Check ' + r.to + ' (and Spam).' : 'Sent! Check WhatsApp on that number.') : 'Not sent: ' + (r.error || 'unknown problem');
+  $(out).style.color = r.ok ? 'var(--green)' : 'var(--red)'; load();
+}
+$('tEmail').onclick = function () { testMsg('email', this, 'tEmailR'); };
+$('tWa').onclick = function () { testMsg('whatsapp', this, 'tWaR'); };
+$('f').addEventListener('submit', async function (e) {
+  e.preventDefault(); showMsg('msg', '');
+  var fd = new FormData();
+  ['pay_cod', 'pay_emi', 'pay_online', 'online_auto', 'remove_qr'].forEach(function (k) { fd.append(k, $(k).checked ? '1' : '0'); });
+  ['emi_rate', 'emi_min', 'emi_months', 'upi_id', 'qr_note', 'smtp_host', 'smtp_port', 'smtp_secure', 'smtp_user', 'smtp_pass', 'smtp_from', 'wa_phone_id', 'wa_token', 'wa_template', 'wa_lang'].forEach(function (k) { fd.append(k, $(k).value.trim()); });
+  if ($('qr').files[0]) fd.append('qr', $('qr').files[0]);
+  $('go').disabled = true; var r = await callForm('settings_save.php', fd); $('go').disabled = false;
+  if (!r.ok) { showMsg('msg', r.error); window.scrollTo(0, 0); return; }
+  $('qr').value = ''; showMsg('msg', 'Settings saved.', true); toast('Saved'); load();
+});
+$('dLoad').onclick = async function () {
+  showMsg('dMsg', ''); $('dLoad').disabled = true; var r = await call('demo_data.php', { action: 'load' }); $('dLoad').disabled = false;
+  if (!r.ok) { showMsg('dMsg', r.error); return; } showMsg('dMsg', 'Added ' + r.added.orders + ' sample orders, ' + r.added.customers + ' sample customers and ' + r.added.expenses + ' expenses. Open Reports to see them.', true); load();
+};
+$('dDel').onclick = async function () {
+  if (!confirm('Remove all sample orders, sample customers and sample expenses?')) return;
+  showMsg('dMsg', ''); var r = await call('demo_data.php', { action: 'remove' });
+  if (!r.ok) { showMsg('dMsg', r.error); return; } showMsg('dMsg', 'Removed ' + r.removed.orders + ' sample orders, ' + r.removed.customers + ' sample customers and ' + r.removed.expenses + ' expenses.', true); load();
+};
+(async function () { if (await guard(['admin'])) load(); })();
+</script></body></html>

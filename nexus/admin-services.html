@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Services | Nexus Media Labs</title><link rel="stylesheet" href="assets/auth.css"></head>
+<body>
+<header class="top"><div class="in">
+  <a class="brand" href="index.html"><span class="mark">N</span><span>NEXUS<small>MEDIA LABS</small></span></a>
+  <nav id="nav"></nav>
+</div></header>
+<main class="wrap">
+  <div class="page-h"><div><h1>Services and prices</h1><p class="muted">What customers can buy. <b>Your cost</b> is what it costs you to deliver one unit. It is never shown to customers, and it is used to work out profit.</p></div>
+    <button class="btn auto" id="add" type="button">+ Add service</button></div>
+  <div class="alert bad show" id="costNote" style="display:none">The costs were filled in as an estimate (60% of the price). Change them to your real figures so that profit and loss are correct.</div>
+  <div id="msg" class="alert"></div>
+  <div class="tbl" style="margin-top:16px"><table style="min-width:860px">
+    <thead><tr><th>Service</th><th>Group</th><th>Unit</th><th class="num">Price</th><th class="num">Your cost</th><th class="num">Margin</th><th>Shown</th><th>Actions</th></tr></thead>
+    <tbody id="rows"></tbody></table></div>
+</main>
+
+<dialog id="dlg" class="wide"><h2 id="dlgT">Add service</h2>
+  <div id="dMsg" class="alert"></div>
+  <form id="f" novalidate>
+    <label for="n">Name</label><input id="n" maxlength="120" placeholder="For example: SEO">
+    <div class="two"><div><label for="c">Group</label><input id="c" maxlength="40" placeholder="For example: SEO" list="cats"><datalist id="cats"></datalist></div>
+      <div><label for="u">Unit</label><input id="u" maxlength="30" placeholder="per month, one-time, per video"></div></div>
+    <div class="two"><div><label for="p">Price (&#8377;)</label><input id="p" type="number" min="1" step="0.01"></div>
+      <div><label for="k">Your cost (&#8377;)</label><input id="k" type="number" min="0" step="0.01"></div></div>
+    <label for="d">Description</label><textarea id="d" maxlength="500" style="min-height:80px"></textarea>
+    <div class="two"><div><label for="o">Order on the page</label><input id="o" type="number" step="1" value="0"><div class="hint">Smaller numbers come first.</div></div>
+      <div><label class="switch" style="margin-top:34px"><input id="a" type="checkbox" checked> Show to customers</label></div></div>
+    <div class="row" style="display:flex;gap:10px;margin-top:18px"><button class="btn ghost" id="no" type="button">Cancel</button><button class="btn" id="ok" type="submit">Save</button></div>
+  </form>
+</dialog>
+
+<script src="assets/auth.js"></script><script src="assets/shop.js"></script>
+<script>
+var LIST = [], EDIT = 0;
+function draw() {
+  $('rows').innerHTML = LIST.map(function (s) {
+    var m = s.price > 0 ? Math.round((s.price - s.cost) * 1000 / s.price) / 10 : 0;
+    return '<tr><td><b>' + esc(s.name) + '</b></td><td>' + esc(s.category) + '</td><td>' + esc(s.unit) + '</td><td class="num">' + inr(s.price) + '</td><td class="num">' + inr(s.cost) + '</td>' +
+      '<td class="num ' + (m < 0 ? 'down' : '') + '">' + m + '%</td><td><span class="badge ' + (s.active ? 'active' : 'disabled') + '">' + (s.active ? 'shown' : 'hidden') + '</span></td>' +
+      '<td><div class="acts"><button class="btn ghost sm" data-e="' + s.id + '">Edit</button><button class="btn ghost sm" data-t="' + s.id + '">' + (s.active ? 'Hide' : 'Show') + '</button><button class="btn danger sm" data-x="' + s.id + '">Delete</button></div></td></tr>';
+  }).join('') || '<tr><td colspan="8" class="muted">No services yet.</td></tr>';
+  $('cats').innerHTML = LIST.map(function (s) { return s.category; }).filter(function (c, i, a) { return a.indexOf(c) === i; }).map(function (c) { return '<option value="' + esc(c) + '">'; }).join('');
+}
+async function load() {
+  var r = await call('services.php?all=1');
+  if (!r.ok) { showMsg('msg', r.error); return; }
+  LIST = r.services; draw();
+  $('costNote').style.display = LIST.length && LIST.every(function (s) { return Math.abs(s.cost - s.price * 0.6) < 0.51; }) ? '' : 'none';
+}
+function openDlg(s) {
+  EDIT = s ? s.id : 0; $('dlgT').textContent = s ? 'Edit service' : 'Add service'; showMsg('dMsg', '');
+  $('n').value = s ? s.name : ''; $('c').value = s ? s.category : ''; $('u').value = s ? s.unit : 'per month'; $('p').value = s ? s.price : ''; $('k').value = s ? s.cost : '';
+  $('d').value = s ? s.description : ''; $('o').value = s ? s.sort_order : (LIST.length + 1) * 10; $('a').checked = s ? s.active : true;
+  $('dlg').showModal();
+}
+$('add').onclick = function () { openDlg(null); };
+$('no').onclick = function () { $('dlg').close(); };
+$('rows').addEventListener('click', async function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  var id = +(b.dataset.e || b.dataset.t || b.dataset.x), s = LIST.filter(function (x) { return x.id === id; })[0];
+  if (b.dataset.e) return openDlg(s);
+  if (b.dataset.x && !confirm('Delete "' + s.name + '"? Past orders keep their own copy, so the sales history stays correct.')) return;
+  var r = await call('service_save.php', { action: b.dataset.t ? 'toggle' : 'delete', id: id });
+  if (!r.ok) { showMsg('msg', r.error); return; } load();
+});
+$('f').addEventListener('submit', async function (e) {
+  e.preventDefault(); showMsg('dMsg', '');
+  var r = await call('service_save.php', { action: 'save', id: EDIT, name: $('n').value, category: $('c').value, unit: $('u').value, price: $('p').value, cost: $('k').value, description: $('d').value, sort_order: $('o').value, active: $('a').checked });
+  if (!r.ok) { showMsg('dMsg', r.error); return; }
+  $('dlg').close(); toast('Saved'); load();
+});
+(async function () { if (await guard(['admin'])) load(); })();
+</script></body></html>

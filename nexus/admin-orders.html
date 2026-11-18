@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Orders | Nexus Media Labs</title><link rel="stylesheet" href="assets/auth.css"></head>
+<body>
+<header class="top"><div class="in">
+  <a class="brand" href="index.html"><span class="mark">N</span><span>NEXUS<small>MEDIA LABS</small></span></a>
+  <nav id="nav"></nav>
+</div></header>
+<main class="wrap">
+  <div class="page-h"><div><h1>Orders</h1><p class="muted">Every purchase. Change the order status as work moves on, and mark a payment as paid when the money arrives.</p></div>
+    <button class="btn ghost auto" id="csv" type="button">Download as CSV</button></div>
+  <div class="filters">
+    <input id="q" type="search" placeholder="Customer name, email or order no.">
+    <select id="st"><option value="">Any status</option><option>placed</option><option>confirmed</option><option>completed</option><option>cancelled</option></select>
+    <select id="ps"><option value="">Any payment</option><option>pending</option><option>paid</option><option>refunded</option></select>
+    <select id="pm"><option value="">Any method</option><option value="cod">Cash on delivery</option><option value="emi">EMI</option><option value="online">Online</option></select>
+    <input type="date" id="from" title="From"><input type="date" id="to" title="To">
+  </div>
+  <div id="msg" class="alert"></div>
+  <p class="muted" id="count"></p>
+  <div class="tbl"><table style="min-width:1000px">
+    <thead><tr><th>Order</th><th>Date</th><th>Customer</th><th>Services</th><th class="num">Total</th><th class="num">Profit</th><th>Method</th><th>Payment</th><th>Status</th></tr></thead>
+    <tbody id="rows"></tbody></table></div>
+</main>
+
+<dialog id="dlg" class="wide"><h2 id="dT">Order</h2><div id="dBody"></div><div class="row" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px"><a class="btn ghost" id="dWa" target="_blank" rel="noopener" href="#" style="display:none">Send WhatsApp confirmation</a><button class="btn" id="dX" type="button">Close</button></div></dialog>
+
+<script src="assets/auth.js"></script><script src="assets/shop.js"></script>
+<script>
+var ORDERS = [], t;
+function opts(list, cur) { return list.map(function (v) { return '<option' + (v === cur ? ' selected' : '') + '>' + v + '</option>'; }).join(''); }
+function draw() {
+  $('count').textContent = ORDERS.length + ' order(s) shown';
+  $('rows').innerHTML = ORDERS.map(function (o) {
+    var names = o.items.map(function (i) { return esc(i.name) + (i.qty > 1 ? ' x' + i.qty : ''); }).join(', ');
+    return '<tr><td><a href="#" data-d="' + o.id + '"><b>' + esc(o.order_no) + '</b></a>' + (o.is_demo ? ' <span class="badge demo">sample</span>' : '') + '</td><td>' + esc(fmtDate(o.created_at)) + '</td>' +
+      '<td>' + esc(o.customer_name) + '<br><span class="muted">' + esc(o.customer_email) + (o.customer_phone ? '<br>+91 ' + esc(o.customer_phone) : '') + '</span></td><td style="max-width:240px">' + names + '</td>' +
+      '<td class="num"><b>' + inr(o.total) + '</b></td><td class="num ' + (o.profit < 0 ? 'down' : '') + '">' + inr(o.profit) + '</td><td>' + esc(o.payment_label) + '</td>' +
+      '<td><select data-p="' + o.id + '">' + opts(['pending', 'paid', 'refunded'], o.payment_status) + '</select></td>' +
+      '<td><select data-s="' + o.id + '">' + opts(['placed', 'confirmed', 'completed', 'cancelled'], o.status) + '</select></td></tr>';
+  }).join('') || '<tr><td colspan="9" class="muted">No orders found.</td></tr>';
+}
+async function load() {
+  var q = [];
+  [['q', 'q'], ['st', 'status'], ['ps', 'payment_status'], ['pm', 'payment_method'], ['from', 'from'], ['to', 'to']].forEach(function (p) { var v = $(p[0]).value.trim(); if (v) q.push(p[1] + '=' + encodeURIComponent(v)); });
+  var r = await call('orders.php' + (q.length ? '?' + q.join('&') : ''));
+  if (!r.ok) { showMsg('msg', r.error); return; }
+  showMsg('msg', r.limited ? 'Only the newest 500 orders are shown. Use the filters to narrow down.' : ''); ORDERS = r.orders; draw();
+}
+['st', 'ps', 'pm', 'from', 'to'].forEach(function (id) { $(id).onchange = load; });
+$('q').addEventListener('input', function () { clearTimeout(t); t = setTimeout(load, 300); });
+$('rows').addEventListener('change', async function (e) {
+  var s = e.target; var id = +(s.dataset.p || s.dataset.s); if (!id) return;
+  var d = { id: id }; if (s.dataset.p) d.payment_status = s.value; else d.status = s.value;
+  var r = await call('order_update.php', d);
+  if (!r.ok) { toast(r.error, true); load(); return; }
+  toast('Updated'); load();
+});
+$('rows').addEventListener('click', function (e) {
+  var a = e.target.closest('[data-d]'); if (!a) return; e.preventDefault();
+  var o = ORDERS.filter(function (x) { return x.id === +a.dataset.d; })[0];
+  $('dWa').style.display = o.customer_phone ? '' : 'none'; $('dWa').href = o.customer_phone ? waLink(o.customer_phone, waText(o)) : '#';
+  $('dT').textContent = o.order_no + ' for ' + o.customer_name;
+  $('dBody').innerHTML = '<p class="muted">' + esc(o.customer_email) + ' &middot; ' + esc(fmtDate(o.created_at)) + '</p>' +
+    '<div class="tbl" style="margin-top:12px"><table style="min-width:0"><thead><tr><th>Service</th><th class="num">Price</th><th class="num">Qty</th><th class="num">Total</th></tr></thead><tbody>' +
+    o.items.map(function (i) { return '<tr><td>' + esc(i.name) + '</td><td class="num">' + inr(i.unit_price) + '</td><td class="num">' + i.qty + '</td><td class="num">' + inr(i.line_total) + '</td></tr>'; }).join('') + '</tbody></table></div>' +
+    '<dl class="kv" style="margin-top:14px"><dt>Subtotal</dt><dd>' + inr(o.subtotal) + '</dd>' + (o.interest > 0 ? '<dt>EMI interest</dt><dd>' + inr(o.interest) + '</dd>' : '') +
+    '<dt>Total</dt><dd><b>' + inr(o.total) + '</b></dd><dt>Your cost</dt><dd>' + inr(o.cost_total) + '</dd><dt>Profit</dt><dd class="' + (o.profit < 0 ? 'down' : 'up') + '">' + inr(o.profit) + '</dd>' +
+    (o.customer_phone ? '<dt>Mobile</dt><dd>+91 ' + esc(o.customer_phone) + '</dd><dt>Deliver to</dt><dd>' + esc([o.address_line, o.city, o.state].filter(Boolean).join(', ') + ' - ' + o.pincode) + '</dd>' : '') +
+    '<dt>Payment</dt><dd>' + (o.payment_status === 'paid' ? tickHtml('ok', true) + ' ' : '') + esc(o.payment_label) + (o.emi_months ? ': ' + inr(o.emi_monthly) + ' a month for ' + o.emi_months + ' months' : '') + '</dd>' +
+    (o.pay_ref ? '<dt>Reference</dt><dd>' + esc(o.pay_ref) + '</dd>' : '') + (o.note ? '<dt>Customer note</dt><dd>' + esc(o.note) + '</dd>' : '') + '</dl>';
+  $('dlg').showModal();
+});
+$('dX').onclick = function () { $('dlg').close(); };
+$('csv').onclick = function () {
+  var rows = [['Order', 'Date', 'Customer', 'Email', 'Mobile', 'Address', 'Services', 'Total', 'Cost', 'Profit', 'Method', 'Payment', 'Status']];
+  ORDERS.forEach(function (o) { rows.push([o.order_no, o.created_at, o.customer_name, o.customer_email, o.customer_phone, [o.address_line, o.city, o.state, o.pincode].join(' '), o.items.map(function (i) { return i.name + ' x' + i.qty; }).join('; '), o.total, o.cost_total, o.profit, o.payment_label, o.payment_status, o.status]); });
+  csvDownload('orders.csv', rows);
+};
+(async function () {
+  if (!await guard(['admin'])) return;
+  var p = new URLSearchParams(location.search); if (p.get('q')) $('q').value = p.get('q');
+  load();
+})();
+</script></body></html>

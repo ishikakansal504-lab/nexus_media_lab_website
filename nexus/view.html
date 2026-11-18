@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Portfolio | Nexus Media Labs</title><link rel="stylesheet" href="assets/auth.css"></head>
+<body>
+<header class="top"><div class="in">
+  <a class="brand" href="index.html"><span class="mark">N</span><span>NEXUS<small>MEDIA LABS</small></span></a>
+  <nav id="nav"></nav>
+</div></header>
+<main class="wrap">
+  <div id="msg" class="alert"></div>
+  <div id="page"></div>
+</main>
+<script src="assets/auth.js"></script><script src="assets/portfolio.js"></script>
+<script>
+(async function () {
+  var me = await whoami();
+  if (!me.ok || !me.user) { location.replace('login.html?as=employee'); return; }
+  if (me.user.role === 'customer') { location.replace('dashboard.html'); return; }
+  var id = new URLSearchParams(location.search).get('id');
+  var viewingOther = id && +id !== me.user.id;
+  $('nav').innerHTML = (viewingOther ? '<a href="admin.html">← Admin panel</a><a href="all-work.html">All work</a>' : '<a href="portfolio.html">Edit my portfolio</a><a href="employee.html">My workspace</a>') +
+    '<button class="btn ghost sm" onclick="doLogout()">Log out</button>';
+  var r = await call('portfolio.php' + (viewingOther ? '?user_id=' + encodeURIComponent(id) : ''));
+  if (!r.ok) { showMsg('msg', r.error); return; }
+  var o = r.owner, p = r.profile;
+  document.title = o.name + ' | Portfolio';
+  var contact = [];
+  if (p.location) contact.push('📍 ' + esc(p.location));
+  contact.push('✉️ ' + esc(o.email));
+  if (p.phone) contact.push('📞 ' + esc(p.phone));
+  var links = [['LinkedIn', p.linkedin], ['GitHub', p.github], ['Website', p.website]].filter(function (x) { return x[1]; }).map(function (x) {
+    return '<a class="chip link" href="' + esc(safeUrl(x[1])) + '" target="_blank" rel="noopener noreferrer">🔗 ' + x[0] + '</a>';
+  }).join('');
+  var html = '<section class="card"><div class="hero-card"><div class="avatar">' + esc(o.name.trim().charAt(0).toUpperCase()) + '</div><div>' +
+    '<h1 style="margin:0">' + esc(o.name) + '</h1>' + (p.headline ? '<div style="font-size:1.05rem">' + esc(p.headline) + '</div>' : '<div class="muted">No headline yet</div>') +
+    '<div class="muted" style="margin-top:4px">' + contact.join(' &nbsp;·&nbsp; ') + '</div>' + (links ? '<div class="chips">' + links + '</div>' : '') + '</div></div>' +
+    (p.bio ? '<p style="margin-top:16px">' + nl2br(p.bio) + '</p>' : '') + '</section>';
+  var rec = r.record, cats = Object.keys(rec.categories).map(function (k) { return k + ' (' + rec.categories[k] + ')'; }).join(', ');
+  html += '<section class="sec"><h2>Staff record</h2><div class="card"><div style="margin-bottom:8px"><span class="idcode">' + esc(o.code) + '</span> <span class="badge ' + (o.role === 'admin' ? 'admin' : 'employee') + '">' + esc(o.role) + '</span> <span class="badge ' + o.status + '">' + esc(o.status) + '</span></div>' +
+    '<dl class="kv"><dt>Designation</dt><dd>' + esc(o.designation || '-') + '</dd><dt>Department</dt><dd>' + esc(o.department || '-') + '</dd><dt>Joined</dt><dd>' + esc(fmtDay(o.joined.slice(0, 10))) + ' (' + rec.days_with_us + ' days)</dd><dt>Work types</dt><dd>' + esc(cats || '-') + '</dd></dl>' +
+    '<div class="stats4"><div><b>' + rec.works + '</b><span class="muted">Work items</span></div><div><b>' + rec.files + '</b><span class="muted">Files</span></div><div><b>' + (rec.first_work ? esc(fmtDay(rec.first_work)) : '-') + '</b><span class="muted">First work</span></div><div><b>' + (rec.last_work ? esc(fmtDay(rec.last_work)) : '-') + '</b><span class="muted">Latest work</span></div></div>' +
+    (o.admin_note !== undefined ? '<div class="alert good show" style="margin-top:14px"><b>Private admin note</b> (the employee cannot see this)<br>' + (o.admin_note ? nl2br(o.admin_note) : '<span class="muted">No note yet. Add one with Details in the admin panel.</span>') + '</div>' : '') + '</div></section>';
+  if (p.skills) html += '<section class="sec"><h2>Skills</h2><div class="chips">' + skillChips(p.skills) + '</div></section>';
+  if (p.education) html += '<section class="sec"><h2>Education</h2><div class="card"><p style="color:var(--text)">' + nl2br(p.education) + '</p></div></section>';
+  if (p.experience) html += '<section class="sec"><h2>Experience</h2><div class="card"><p style="color:var(--text)">' + nl2br(p.experience) + '</p></div></section>';
+  html += '<section class="sec"><h2>Work (' + r.works.length + ')</h2>' + (r.works.length ? '<div class="works">' + r.works.map(function (w) { return workCard(w, {}); }).join('') + '</div>' : '<div class="empty">No work added yet.</div>') + '</section>';
+  $('page').innerHTML = html;
+})();
+</script></body></html>

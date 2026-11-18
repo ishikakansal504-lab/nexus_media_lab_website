@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin | Nexus Media Labs</title><link rel="stylesheet" href="assets/auth.css"></head>
+<body>
+<header class="top"><div class="in">
+  <a class="brand" href="index.html"><span class="mark">N</span><span>NEXUS<small>MEDIA LABS</small></span></a>
+  <nav id="nav"></nav>
+</div></header>
+<main class="wrap">
+  <h1>Admin panel</h1>
+  <p class="muted">Add, disable and remove staff and customers. Staff keep portfolios; customers buy services. The main admin (marked Owner) is the only one who can create, approve or remove other admins.</p>
+
+  <div class="grid g3" style="margin-top:22px">
+    <div class="card stat"><b id="sTotal">0</b><span class="muted">Total accounts</span></div>
+    <div class="card stat"><b id="sActive">0</b><span class="muted">Active</span></div>
+    <div class="card stat"><b id="sOff">0</b><span class="muted">Disabled</span></div>
+  </div>
+
+  <div class="alert good" id="pendBox" style="display:none"></div>
+  <p style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap"><a class="btn auto" href="admin-desk.html">Staff desk</a><a class="btn ghost auto" href="admin-reports.html">Sales and profit</a><a class="btn ghost auto" href="admin-orders.html">Orders</a><a class="btn ghost auto" href="all-work.html">See everyone's work</a></p>
+
+  <section class="card" style="margin-top:22px">
+    <h2>Add an account</h2>
+    <div id="addMsg" class="alert"></div>
+    <form id="addF" novalidate>
+      <div class="grid g3" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr))">
+        <div><label for="ar">Account type</label><select id="ar"><option value="employee">Employee (keeps a portfolio)</option><option value="customer">Customer (buys services)</option><option value="admin" id="optAdmin" hidden>Admin (full access, main admin only)</option></select></div>
+        <div><label for="an">Full name</label><input id="an" placeholder="Name"></div>
+        <div><label for="ae">Email</label><input id="ae" type="email" placeholder="user@example.com"></div>
+        <div><label for="ap">Password</label><input id="ap" type="text" autocomplete="off" placeholder="8+ characters, letters and numbers"></div>
+      </div>
+      <button class="btn" type="submit" style="width:auto;margin-top:16px">Add account</button>
+    </form>
+  </section>
+
+  <div class="tools"><h2 style="margin:0">All users</h2><input id="q" type="search" placeholder="Search name or email"></div>
+  <div id="listMsg" class="alert"></div>
+  <div class="tbl"><table>
+    <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Activity</th><th>Joined</th><th>Last login</th><th>Actions</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table></div>
+</main>
+
+<dialog id="dlg"><h2 id="dlgT">Reset password</h2><p class="muted" id="dlgU"></p>
+  <div id="dlgMsg" class="alert"></div>
+  <label for="dlgP">New password</label><input id="dlgP" type="text" autocomplete="off" placeholder="8+ characters, letters and numbers">
+  <div class="row"><button class="btn ghost" id="dlgNo" type="button">Cancel</button><button class="btn" id="dlgOk" type="button">Save</button></div>
+</dialog>
+
+<dialog id="edlg" class="wide"><h2>Employee details</h2><p class="muted" id="edU"></p>
+  <div id="edMsg" class="alert"></div>
+  <div class="two"><div><label for="edD">Designation</label><input id="edD" maxlength="80" placeholder="e.g. Social media executive"></div><div><label for="edP">Department</label><input id="edP" maxlength="60" placeholder="e.g. Content"></div></div>
+  <label for="edN">Private note (only admins can see this; the employee never can)</label><textarea id="edN" maxlength="2000" placeholder="Performance remarks, pay discussions, internal notes..."></textarea>
+  <div class="row" style="display:flex;gap:10px;margin-top:16px"><button class="btn ghost" id="edNo" type="button">Cancel</button><button class="btn" id="edOk" type="button">Save</button></div>
+</dialog>
+
+<script src="assets/auth.js"></script><script src="assets/shop.js"></script>
+<script>
+var USERS = [], resetId = 0, editId = 0, ME_OWNER = false, ME_ID = 0;
+
+async function guard() {
+  var me = await whoami();
+  if (!me.ok || !me.user) { location.replace('login.html?as=admin'); return false; }
+  if (me.user.role !== 'admin') { location.replace('dashboard.html'); return false; }
+  ME_ID = me.user.id; buildNav(me.user, 0);
+  return true;
+}
+async function load() {
+  var r = await call('users.php');
+  if (!r.ok) { showMsg('listMsg', r.error); return; }
+  USERS = r.users; ME_OWNER = r.me_owner; $('optAdmin').hidden = !ME_OWNER; draw();
+  var pend = USERS.filter(function (u) { return u.requested_role && (u.requested_role !== 'admin' || ME_OWNER); }).length;
+  $('pendBox').style.display = pend ? '' : 'none';
+  $('pendBox').innerHTML = pend ? pend + ' access request(s) are waiting for you. <a href="admin-desk.html">Review them</a>' : '';
+}
+function roleLabel(u) { return u.is_owner ? 'Main admin' : u.role; }
+function draw() {
+  var q = $('q').value.trim().toLowerCase();
+  var act = USERS.filter(function (u) { return u.status === 'active'; }).length;
+  $('sTotal').textContent = USERS.length; $('sActive').textContent = act; $('sOff').textContent = USERS.length - act;
+  var list = USERS.filter(function (u) { return !q || u.name.toLowerCase().indexOf(q) > -1 || u.email.toLowerCase().indexOf(q) > -1 || u.code.toLowerCase().indexOf(q) > -1; });
+  $('rows').innerHTML = list.length ? list.map(function (u) {
+    var locked = u.is_owner || u.id === ME_ID || (u.role === 'admin' && !ME_OWNER);
+    var acts = u.is_owner ? '<span class="muted">Protected (main admin)</span>' : '<div class="acts">' +
+      (u.role === 'customer' ? '<a class="btn ghost sm" href="admin-orders.html?q=' + encodeURIComponent(u.email) + '">Orders</a>' : '<a class="btn ghost sm" href="view.html?id=' + u.id + '">Record</a>') +
+      (u.role === 'employee' || (u.role === 'admin' && ME_OWNER) ? '<button class="btn ghost sm" data-a="edit" data-id="' + u.id + '">Details</button>' : '') +
+      (locked ? (u.id === ME_ID ? '<span class="muted">You</span>' : '<span class="muted">Main admin only</span>') :
+        '<select data-role="' + u.id + '" aria-label="Change account type"><option value="">Change type...</option>' + ['customer', 'employee'].concat(ME_OWNER ? ['admin'] : []).filter(function (r) { return r !== u.role; }).map(function (r) { return '<option value="' + r + '">Make ' + r + '</option>'; }).join('') + '</select>' +
+        '<button class="btn ghost sm" data-a="toggle" data-id="' + u.id + '">' + (u.status === 'active' ? 'Disable' : 'Enable') + '</button>' +
+        '<button class="btn ghost sm" data-a="reset" data-id="' + u.id + '">Reset password</button>' +
+        '<button class="btn danger sm" data-a="delete" data-id="' + u.id + '">Delete</button>') + '</div>';
+    var req = u.requested_role ? ' <span class="badge req">wants ' + u.requested_role + '</span>' : '';
+    var det = [u.designation, u.department].filter(Boolean).join(' · ');
+    return '<tr><td><span class="idcode">' + esc(u.code) + '</span></td><td>' + esc(u.name) + (det ? '<br><span class="muted">' + esc(det) + '</span>' : '') + '</td><td>' + esc(u.email) + '</td><td><span class="badge ' + (u.is_owner ? 'owner' : u.role) + '">' + roleLabel(u) + '</span>' + req + '</td>' +
+      '<td><span class="badge ' + u.status + '">' + u.status + '</span></td><td>' + (u.role === 'customer' ? u.orders_count + ' order(s), ' + inr(u.spent) : u.works_count + ' work item(s)') + '</td><td>' + esc(fmtDate(u.created_at)) + '</td><td>' + esc(fmtDate(u.last_login)) + '</td><td>' + acts + '</td></tr>';
+  }).join('') : '<tr><td colspan="9" class="muted">No users found.</td></tr>';
+}
+$('q').addEventListener('input', draw);
+
+$('rows').addEventListener('click', async function (e) {
+  var b = e.target.closest('button[data-a]'); if (!b) return;
+  var id = +b.dataset.id, u = USERS.filter(function (x) { return x.id === id; })[0]; showMsg('listMsg', '');
+  if (b.dataset.a === 'edit') { editId = id; $('edU').textContent = u.name + ' (' + u.code + ')'; $('edD').value = u.designation; $('edP').value = u.department; $('edN').value = u.admin_note || ''; showMsg('edMsg', ''); $('edlg').showModal(); return; }
+  if (b.dataset.a === 'reset') { resetId = id; $('dlgU').textContent = u.name + ' (' + u.email + ')'; $('dlgP').value = ''; showMsg('dlgMsg', ''); $('dlg').showModal(); return; }
+  if (b.dataset.a === 'delete' && !confirm('Delete ' + u.name + '? This cannot be undone.')) return;
+  var r = await call('users.php', { action: b.dataset.a, id: id });
+  if (!r.ok) { showMsg('listMsg', r.error); return; }
+  load();
+});
+
+$('addF').addEventListener('submit', async function (e) {
+  e.preventDefault(); showMsg('addMsg', '');
+  var d = { action: 'add', role: $('ar').value, name: $('an').value.trim(), email: $('ae').value.trim(), password: $('ap').value };
+  if (!d.name || !d.email || !d.password) { showMsg('addMsg', 'Fill in name, email and password.'); return; }
+  var r = await call('users.php', d);
+  if (!r.ok) { showMsg('addMsg', r.error); return; }
+  $('addF').reset(); showMsg('addMsg', 'Account added. Share the password with them privately.', true); load();
+});
+
+$('rows').addEventListener('change', async function (e) {
+  var s = e.target.closest('select[data-role]'); if (!s || !s.value) return;
+  var u = USERS.filter(function (x) { return x.id === +s.dataset.role; })[0];
+  if (!confirm('Make ' + u.name + ' a ' + s.value + '?' + (s.value === 'admin' ? ' Admins can see all sales, profit and customer data.' : ''))) { s.value = ''; return; }
+  var r = await call('users.php', { action: 'set_role', id: u.id, role: s.value });
+  if (!r.ok) { showMsg('listMsg', r.error); s.value = ''; return; }
+  load();
+});
+$('edNo').onclick = function () { $('edlg').close(); };
+$('edOk').onclick = async function () {
+  var r = await call('users.php', { action: 'edit', id: editId, designation: $('edD').value, department: $('edP').value, admin_note: $('edN').value });
+  if (!r.ok) { showMsg('edMsg', r.error); return; }
+  $('edlg').close(); showMsg('listMsg', 'Details saved.', true); load();
+};
+$('dlgNo').onclick = function () { $('dlg').close(); };
+$('dlgOk').onclick = async function () {
+  var r = await call('users.php', { action: 'reset', id: resetId, password: $('dlgP').value });
+  if (!r.ok) { showMsg('dlgMsg', r.error); return; }
+  $('dlg').close(); showMsg('listMsg', 'Password updated.', true);
+};
+
+guard().then(function (ok) { if (ok) load(); });
+</script></body></html>

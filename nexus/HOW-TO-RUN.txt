@@ -1,0 +1,105 @@
+NEXUS MEDIA LABS: WEBSITE + LOGIN + SHOP SYSTEM (PHP + MySQL/MariaDB)
+=====================================================================
+Contact shown on the website: ishikakansal504@gmail.com, +91 79828 45849
+
+RUN ON UBUNTU (DBeaver)
+  1. sudo apt install mariadb-server php-cli php-mysql ; sudo systemctl enable --now mariadb
+  2. sudo mysql
+       CREATE DATABASE nexus_media_labs CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+       CREATE USER 'nexus'@'localhost' IDENTIFIED BY 'ChooseAStrongPassword1';
+       GRANT ALL PRIVILEGES ON nexus_media_labs.* TO 'nexus'@'localhost';
+       FLUSH PRIVILEGES; EXIT;
+  3. In api/config.php change 'root' to 'nexus' and put your password next to DB_PASS.
+  4. In the folder run:  ./run.sh   then open http://localhost:8000/setup.php (first time only)
+     to create the admin, then delete setup.php. Open http://localhost:8000/
+  (XAMPP also works: copy the folder to htdocs, start Apache + MySQL, open /setup.php.)
+
+YOUR DATABASE PASSWORD (do this once)
+  Copy api/config.local.example.php to api/config.local.php and type your MySQL user and password in it.
+  That file is never overwritten, so updates never lose your password again.
+
+UPDATING FROM THE OLD VERSION
+  Unzip over the old folder. If the site says "Cannot connect to the database", your password was reset by
+  the update: create api/config.local.php as above. Do NOT run setup.php again.
+  The database upgrades itself on the first login: old "user" accounts become "employee",
+  and the shop tables are created automatically.
+
+ACCOUNT TYPES (three separate logins: the login page has Customer / Employee / Admin tabs)
+  Main admin (Owner): the first admin made by setup.php. Only the main admin can create, approve, demote,
+                      disable or delete OTHER admins. Nobody can change the main admin account.
+  Admin             : manages employees and customers, orders, services, expenses, reports, settings.
+  Employee          : own workspace with Employee ID (EMP-0007), details, track record, notices, help desk,
+                      portfolio and work. Logs in with the employee ID or the email. Cannot see sales, profit,
+                      costs, customer details, settings or other people's files (the server refuses).
+  Customer          : Shop, Cart, My orders. No portfolio.
+  Sign-up: anyone can create an account and choose Customer, Employee or Admin. Employee and Admin are only
+  REQUESTS: the person stays a customer until an admin approves (admin requests: main admin only) in
+  Admin > Staff desk > Access requests. The admin can also add accounts directly or change a type later.
+
+STAFF DESK (Admin > Staff desk)
+  Access requests, questions from employees (reply to them), notice board for all staff.
+  Admin > Users > Details lets the admin set an employee's designation and department and keep a PRIVATE
+  note that the employee can never see. Users > Record shows an employee's track record.
+
+FILES IN PORTFOLIOS
+  Clicking a work file opens a viewer (picture, video, PDF) with a Download button inside; other file types
+  show a Download button. Employees open "Add work" from the menu or from My workspace.
+
+SHOP FOR VISITORS
+  Shop and Cart are in the website menu for everyone. A visitor can browse the services, but pressing
+  "Add to cart" (or Cart) asks them to log in or create a free customer account first; after logging in
+  they come back and the service is already in the cart.
+
+CHECKOUT DETAILS
+  Before paying, the customer fills in full name, mobile number, email, address, city, state and PIN code
+  (filled in automatically next time). They are saved with the order; the admin sees them in Orders.
+
+CONFIRMATION MESSAGES (automatic, sent from the business email / WhatsApp number)
+  Both are set up by the admin on Admin > Settings; each has a "send a test" button and the page lists every
+  message sent and its result.
+  Email: sent to the customer when the order is placed and again when the payment is marked paid; the admin
+         (ishikakansal504@gmail.com) gets a copy of every new order. Needs a Gmail "App password": Google
+         Account > Security > turn on 2-step verification > App passwords > create one, paste the 16 letters
+         in Settings (server smtp.gmail.com, port 587, TLS, username = the Gmail address).
+  WhatsApp: automatic WhatsApp needs the WhatsApp Business Cloud API (free Meta business account). Create a
+         message template (Utility) with the body: Hello {{1}}, your order {{2}} at Nexus Media Labs is
+         received. Total {{3}}. Status: {{4}}.   then paste Phone number ID, access token and template name
+         in Settings. Meta must approve the template; in Meta's free test mode only numbers you add as
+         recipients receive messages. Until set up, customers still get a "Message us on WhatsApp" button and
+         the admin has "Send WhatsApp confirmation" inside each order (a click-to-chat link).
+
+PAYMENT DONE TICK
+  When a payment is confirmed the customer sees a green tick in a circle (order screen and My orders).
+  Pending payments show an amber clock. The order screen turns green by itself when the admin marks it paid.
+  Settings has a DEMONSTRATION switch that marks online orders paid immediately; keep it off for real use.
+
+SHOP AND PAYMENTS
+  Payment options: cash on delivery, EMI and online (no card option).
+  Customer: Shop > Add to cart > Cart > choose payment > Place order. Past orders are in My orders
+  (a customer can cancel an order that is still new and unpaid).
+  Cash on delivery: pending until the admin marks it paid.
+  EMI             : monthly instalments (months, yearly interest and minimum amount set in Settings).
+  Online          : customer scans the admin's QR / UPI ID and types the transaction number;
+                    admin marks it paid after checking. Shown only when a QR or UPI ID is set.
+
+ADMIN PORTAL
+  Services : prices and YOUR COST per service. The costs start as 60% estimates. Change them to real
+             figures or profit will be wrong.
+  Orders   : filter, change status, mark payment paid / refunded, export CSV.
+  Reports  : Today / week / month / year / last 7 / 30 / 12 months, or any From-To dates.
+             Sales, cost, gross profit, expenses, net profit or loss, chart, by service, by payment
+             method, best customers, CSV download. Add expenses on the same page.
+  Settings : payment methods, EMI, and YOUR SCANNER. The admin can upload, replace or remove his
+             QR picture and UPI ID at any time. No scanner is added now, as requested.
+             Also a button to add / remove SAMPLE data for a demonstration (marked "sample").
+
+SECURITY
+  Passwords are bcrypt hashes; CSRF token on every change; prepared statements; 5 wrong passwords lock
+  an account for 5 minutes; prices always come from the database, never from the browser;
+  uploads are checked and stored outside the web folder.
+
+LIMITS
+  No real payment gateway, no GST invoices, no email sending.
+
+IF SOMETHING GOES WRONG
+  "Cannot connect to the database" -> MariaDB not running or wrong password in api/config.php.

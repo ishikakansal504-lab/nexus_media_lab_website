@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cart | Nexus Media Labs</title><link rel="stylesheet" href="assets/auth.css"></head>
+<body>
+<header class="top"><div class="in">
+  <a class="brand" href="index.html"><span class="mark">N</span><span>NEXUS<small>MEDIA LABS</small></span></a>
+  <nav id="nav"></nav>
+</div></header>
+<main class="wrap">
+  <h1>Your cart</h1>
+  <div id="msg" class="alert"></div>
+  <div id="done" class="card" style="display:none"></div>
+  <div id="empty" class="empty" style="display:none">Your cart is empty. <a href="shop.html">Browse the services</a>.</div>
+  <div class="cols" id="cols" style="display:none">
+    <section class="card">
+      <h2>Items</h2>
+      <div class="tbl" style="border:0"><table style="min-width:520px"><thead><tr><th>Service</th><th class="num">Price</th><th>Quantity</th><th class="num">Total</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+      <h2 style="margin-top:24px">Your details</h2>
+      <p class="muted">We use these to contact you and to send your order confirmation.</p>
+      <div class="fgrid">
+        <div><label for="cName">Full name</label><input id="cName" maxlength="80" autocomplete="name"></div>
+        <div><label for="cPhone">Mobile number</label><input id="cPhone" type="tel" inputmode="numeric" maxlength="16" autocomplete="tel" placeholder="10-digit number"></div>
+        <div class="full"><label for="cEmail">Email</label><input id="cEmail" type="email" maxlength="190" autocomplete="email"></div>
+        <div class="full"><label for="cAddr">Address</label><input id="cAddr" maxlength="200" autocomplete="street-address" placeholder="House no., street, area"></div>
+        <div><label for="cCity">City</label><input id="cCity" maxlength="60" autocomplete="address-level2"></div>
+        <div><label for="cState">State</label><input id="cState" maxlength="60" autocomplete="address-level1"></div>
+        <div><label for="cPin">PIN code</label><input id="cPin" inputmode="numeric" maxlength="6" autocomplete="postal-code" placeholder="6 digits"></div>
+      </div>
+      <label for="note" style="margin-top:18px">Note for us (optional)</label>
+      <input id="note" maxlength="300" placeholder="For example: best time to call, brand name, deadline">
+    </section>
+    <section class="card">
+      <h2>Payment</h2>
+      <div class="pay" id="pay"></div>
+      <div id="detail"></div>
+      <div class="sum" style="margin-top:14px"><span>Services</span><span id="sSub">0</span></div>
+      <div class="sum" id="rInt" style="display:none"><span>EMI interest</span><span id="sInt">0</span></div>
+      <div class="sum big"><span>Total</span><span id="sTot">0</span></div>
+      <button class="btn" id="go" type="button" style="margin-top:14px">Place order</button>
+      <p class="muted" style="margin-top:10px">Prices are checked again on our server when you place the order.</p>
+    </section>
+  </div>
+</main>
+<script src="assets/auth.js"></script><script src="assets/shop.js"></script>
+<script>
+var CART = null, METHOD = '', MONTHS = 0, FILLED = false, POLL = null;
+function emi(p, n, rate) {
+  if (rate <= 0) return Math.round(p / n * 100) / 100;
+  var r = rate / 12 / 100, m = p * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1);
+  return Math.round(m * 100) / 100;
+}
+function methods() {
+  var p = CART.payment, sub = CART.subtotal, out = [];
+  if (p.cod.on) out.push({ id: 'cod', name: 'Cash on delivery', sub: 'Pay in cash when the work is delivered.' });
+  if (p.emi.on) {
+    var ok = sub >= p.emi.min_amount;
+    out.push({ id: 'emi', name: 'EMI', sub: ok ? 'Pay in monthly instalments (' + (p.emi.rate > 0 ? p.emi.rate + '% a year' : 'no extra interest') + ').' : 'Available for orders of ' + inr(p.emi.min_amount) + ' or more.', off: !ok });
+  }
+  if (p.online.on) out.push({ id: 'online', name: 'Online (scan and pay)', sub: 'Scan our QR code or use our UPI ID, then enter the transaction number.' });
+  return out;
+}
+function drawPay() {
+  var list = methods();
+  if (!list.some(function (m) { return m.id === METHOD && !m.off; })) METHOD = (list.filter(function (m) { return !m.off; })[0] || {}).id || '';
+  $('pay').innerHTML = list.map(function (m) {
+    return '<label class="opt' + (m.id === METHOD ? ' sel' : '') + '"><input type="radio" name="pm" value="' + m.id + '"' + (m.id === METHOD ? ' checked' : '') + (m.off ? ' disabled' : '') + '><span><b>' + m.name + '</b><span class="sub">' + esc(m.sub) + '</span></span></label>';
+  }).join('') || '<div class="alert bad show">No payment method is available right now. Please contact us.</div>';
+  drawDetail(); totals();
+}
+function drawDetail() {
+  var p = CART.payment, h = '';
+  if (METHOD === 'emi') {
+    h = '<div class="paybox"><label for="mo" style="margin-top:0">Choose the number of months</label><select id="mo">' +
+      p.emi.months.map(function (n) { return '<option value="' + n + '"' + (n === MONTHS ? ' selected' : '') + '>' + n + ' months: ' + inr(emi(CART.subtotal, n, p.emi.rate)) + ' a month</option>'; }).join('') + '</select></div>';
+    if (!MONTHS) MONTHS = p.emi.months[0];
+  } else if (METHOD === 'online') {
+    h = '<div class="paybox">' + (p.online.has_qr ? '<img class="qrimg" alt="Payment QR code" src="api/qr.php?t=' + Date.now() + '">' : '') +
+      (p.online.upi_id ? '<p style="margin-top:8px"><b>UPI ID:</b> ' + esc(p.online.upi_id) + '</p>' : '') +
+      (p.online.note ? '<p class="muted">' + esc(p.online.note) + '</p>' : '') +
+      '<p class="muted" style="margin-top:6px">Pay the total shown below, then type the transaction / UTR number here. We confirm the payment and then start work.</p>' +
+      '<label for="ref">Transaction / UTR number</label><input id="ref" maxlength="40" placeholder="For example 4123456789012"></div>';
+  } else if (METHOD === 'cod') {
+    h = '<div class="paybox muted">You pay in cash when the work is delivered. The order stays "payment pending" until we receive it.</div>';
+  }
+  $('detail').innerHTML = h;
+  if ($('mo')) $('mo').onchange = function () { MONTHS = +this.value; totals(); };
+}
+function totals() {
+  var sub = CART.subtotal, int = 0;
+  if (METHOD === 'emi' && MONTHS) int = Math.round((emi(sub, MONTHS, CART.payment.emi.rate) * MONTHS - sub) * 100) / 100;
+  $('sSub').textContent = inr(sub); $('rInt').style.display = int > 0 ? '' : 'none'; $('sInt').textContent = inr(int); $('sTot').textContent = inr(sub + int);
+}
+function draw() {
+  var has = CART.items.length > 0;
+  $('empty').style.display = has ? 'none' : ''; $('cols').style.display = has ? '' : 'none';
+  $('rows').innerHTML = CART.items.map(function (i) {
+    return '<tr><td><b>' + esc(i.name) + '</b><br><span class="muted">per ' + esc(i.unit.replace('per ', '')) + (i.active ? '' : ' (no longer available)') + '</span></td><td class="num">' + inr(i.price) + '</td>' +
+      '<td><div class="qty"><button type="button" data-d="-1" data-id="' + i.service_id + '">&minus;</button><input value="' + i.qty + '" data-set="' + i.service_id + '" inputmode="numeric" aria-label="Quantity"><button type="button" data-d="1" data-id="' + i.service_id + '">+</button></div></td>' +
+      '<td class="num">' + inr(i.line_total) + '</td><td><button class="btn danger sm" data-rm="' + i.service_id + '">Remove</button></td></tr>';
+  }).join('');
+  if (has) drawPay();
+}
+async function load() {
+  var r = await call('cart.php');
+  if (!r.ok) { showMsg('msg', r.error); return; }
+  CART = r; setCartBadge(r.count); draw();
+  if (!FILLED) { FILLED = true; var p = r.profile || {}; $('cName').value = p.name || ''; $('cPhone').value = p.phone || ''; $('cEmail').value = p.email || ''; $('cAddr').value = p.address || ''; $('cCity').value = p.city || ''; $('cState').value = p.state || ''; $('cPin').value = p.pincode || ''; }
+}
+$('rows').addEventListener('click', async function (e) {
+  var d = e.target.closest('[data-d]'), rm = e.target.closest('[data-rm]'), r;
+  if (d) { var it = CART.items.filter(function (x) { return x.service_id === +d.dataset.id; })[0]; var n = it.qty + +d.dataset.d; if (n < 1 || n > 99) return; r = await call('cart_save.php', { action: 'set', service_id: it.service_id, qty: n }); }
+  else if (rm) r = await call('cart_save.php', { action: 'remove', service_id: +rm.dataset.rm });
+  else return;
+  if (!r.ok) { showMsg('msg', r.error); return; } showMsg('msg', ''); load();
+});
+$('rows').addEventListener('change', async function (e) {
+  var s = e.target.closest('[data-set]'); if (!s) return;
+  var n = Math.min(99, Math.max(1, parseInt(s.value, 10) || 1));
+  var r = await call('cart_save.php', { action: 'set', service_id: +s.dataset.set, qty: n });
+  if (!r.ok) showMsg('msg', r.error); load();
+});
+$('pay').addEventListener('change', function (e) { if (e.target.name === 'pm') { METHOD = e.target.value; drawPay(); } });
+$('go').addEventListener('click', async function () {
+  showMsg('msg', '');
+  if (!METHOD) { showMsg('msg', 'Choose a payment method.'); return; }
+  var d = { method: METHOD, note: $('note').value.trim(), name: $('cName').value.trim(), phone: $('cPhone').value.trim(), email: $('cEmail').value.trim(),
+            address: $('cAddr').value.trim(), city: $('cCity').value.trim(), state: $('cState').value.trim(), pincode: $('cPin').value.trim() };
+  var miss = [['name', 'your full name'], ['phone', 'your mobile number'], ['email', 'your email'], ['address', 'your address'], ['city', 'your city'], ['state', 'your state'], ['pincode', 'your PIN code']].filter(function (f) { return !d[f[0]]; });
+  if (miss.length) { showMsg('msg', 'Please enter ' + miss[0][1] + '.'); window.scrollTo(0, 0); return; }
+  if (METHOD === 'emi') d.emi_months = MONTHS;
+  if (METHOD === 'online') { d.pay_ref = ($('ref').value || '').trim(); if (!d.pay_ref) { showMsg('msg', 'Pay first, then type the transaction / UTR number.'); return; } }
+  $('go').disabled = true;
+  var r = await call('checkout.php', d);
+  $('go').disabled = false;
+  if (!r.ok) { showMsg('msg', r.error); window.scrollTo(0, 0); return; }
+  setCartBadge(0); $('cols').style.display = 'none'; $('empty').style.display = 'none'; $('done').style.display = '';
+  var o = await call('orders.php?id=' + r.order_id); o = (o.orders || [])[0];
+  if (!o) { $('done').innerHTML = '<h2>Thank you! Your order ' + esc(r.order_no) + ' is placed.</h2><a class="btn auto" href="orders.html">View my orders</a>'; return; }
+  showDone(o, r.email_enabled, r.whatsapp_enabled);
+  if (o.payment_status !== 'paid') startPoll(o.id, r.email_enabled, r.whatsapp_enabled);
+});
+function showDone(o, emailOn, waOn) {
+  var paid = o.payment_status === 'paid';
+  $('done').innerHTML = '<div class="donehero">' + tickHtml(paid ? 'ok' : 'wait') +
+    '<h2>' + (paid ? 'Payment done' : 'Order placed') + '</h2>' +
+    '<p class="muted">Order number <b>' + esc(o.order_no) + '</b> &middot; Total <b>' + inr(o.total) + '</b></p></div>' +
+    '<div class="paystate ' + (paid ? 'ok' : 'wait') + '">' + tickHtml(paid ? 'ok' : 'wait', true) + '<div><b>' + (paid ? 'Payment received. Thank you!' : 'Payment pending') + '</b><span class="muted">' +
+      (paid ? 'Our team will start work and keep you updated.' : (o.payment_method === 'cod' ? 'You will pay in cash on delivery.' : 'We are waiting to confirm your payment. This page turns green by itself when it is confirmed.')) + '</span></div></div>' +
+    '<dl class="det"><dt>Name</dt><dd>' + esc(o.customer_name) + '</dd><dt>Mobile</dt><dd>+91 ' + esc(o.customer_phone) + '</dd><dt>Email</dt><dd>' + esc(o.customer_email) + '</dd>' +
+      '<dt>Address</dt><dd>' + esc([o.address_line, o.city, o.state].filter(Boolean).join(', ') + ' - ' + o.pincode) + '</dd><dt>Payment</dt><dd>' + esc(o.payment_label) + (o.emi_months ? ' (' + inr(o.emi_monthly) + ' a month for ' + o.emi_months + ' months)' : '') + '</dd></dl>' +
+    '<p class="muted" style="margin:8px 0 14px">' + ((emailOn || waOn) ? 'We are sending your confirmation' + (emailOn ? ' by email to <b>' + esc(o.customer_email) + '</b>' : '') + (emailOn && waOn ? ' and' : '') + (waOn ? ' on WhatsApp to <b>+91 ' + esc(o.customer_phone) + '</b>' : '') + '.' : 'Your order details are saved under <b>My orders</b>. You can also message us on WhatsApp below.') + '</p>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap">' +
+    '<a class="btn ghost auto" target="_blank" rel="noopener" href="' + waLink(BIZ_PHONE, waText(o).replace(/^Hello [^\n]*,\n\n/, 'Hello ' + BIZ_NAME + ',\n\n')) + '">Message us on WhatsApp</a>' +
+    '<a class="btn ghost auto" href="orders.html">View my orders</a><a class="btn ghost auto" href="shop.html">Keep shopping</a></div>';
+}
+// While the payment is pending, check every few seconds so the tick appears as soon as the admin confirms it.
+function startPoll(id, emailOn, waOn) {
+  var n = 0; clearInterval(POLL);
+  POLL = setInterval(async function () {
+    if (++n > 100) { clearInterval(POLL); return; }
+    var r = await call('orders.php?id=' + id), o = (r.orders || [])[0];
+    if (o && o.payment_status === 'paid') { clearInterval(POLL); showDone(o, emailOn, waOn); toast('Payment received'); }
+  }, 6000);
+}
+(async function () { if (await guard(['customer'])) load(); })();
+</script></body></html>

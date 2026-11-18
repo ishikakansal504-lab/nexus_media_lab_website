@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sales and profit | Nexus Media Labs</title><link rel="stylesheet" href="assets/auth.css"></head>
+<body>
+<header class="top"><div class="in">
+  <a class="brand" href="index.html"><span class="mark">N</span><span>NEXUS<small>MEDIA LABS</small></span></a>
+  <nav id="nav"></nav>
+</div></header>
+<main class="wrap">
+  <div class="page-h"><div><h1>Sales, profit and loss</h1><p class="muted">Pick a period to see what was sold, what it cost, and whether the agency made a profit or a loss.</p></div>
+    <button class="btn ghost auto" id="csv" type="button">Download as CSV</button></div>
+
+  <div class="periodbar" id="presets"></div>
+  <div class="periodbar"><div class="custom">
+    <label style="margin:0">From</label><input type="date" id="from"><label style="margin:0">To</label><input type="date" id="to">
+    <select id="grp" title="Group the bars by"><option value="auto">Group: automatic</option><option value="day">By day</option><option value="week">By week</option><option value="month">By month</option><option value="year">By year</option></select>
+    <select id="basis" title="Which orders to count"><option value="all">Count: all orders</option><option value="paid">Count: paid orders only</option></select>
+    <button class="btn auto sm" id="apply" type="button">Show</button></div></div>
+  <div id="msg" class="alert"></div>
+
+  <div id="verdict" class="verdict"></div>
+  <div class="kpis" id="kpis"></div>
+
+  <section class="card" style="margin-top:18px">
+    <h2>Money in and out</h2>
+    <div class="legend"><span><i style="background:#2f8cff"></i>Sales</span><span><i style="background:#fb923c"></i>Costs and expenses</span><span><i style="background:#4ade80"></i>Profit</span><span><i style="background:#ff7a8a"></i>Loss</span></div>
+    <div class="chartbox" id="chart"></div>
+  </section>
+
+  <div class="grid g2" style="margin-top:18px">
+    <section class="card"><h2>Profit and loss statement</h2>
+      <div class="tbl"><table class="pl" style="min-width:0" id="pl"></table></div></section>
+    <section class="card"><h2>How customers paid</h2>
+      <div class="tbl"><table style="min-width:0"><thead><tr><th>Method</th><th class="num">Orders</th><th class="num">Sales</th></tr></thead><tbody id="byMethod"></tbody></table></div>
+      <h2 style="margin-top:22px">Best customers</h2>
+      <div class="tbl"><table style="min-width:0"><thead><tr><th>Customer</th><th class="num">Orders</th><th class="num">Spent</th></tr></thead><tbody id="top"></tbody></table></div>
+      <p class="muted" id="extra" style="margin-top:14px"></p></section>
+  </div>
+
+  <h2 style="margin:26px 0 10px">By service</h2>
+  <div class="tbl"><table style="min-width:640px"><thead><tr><th>Service</th><th class="num">Sold</th><th class="num">Sales</th><th class="num">Cost</th><th class="num">Profit</th><th class="num">Margin</th></tr></thead><tbody id="bySvc"></tbody></table></div>
+
+  <h2 style="margin:26px 0 10px" id="serT">Period by period</h2>
+  <div class="tbl"><table style="min-width:640px"><thead><tr><th>Period</th><th class="num">Orders</th><th class="num">Sales</th><th class="num">Cost</th><th class="num">Expenses</th><th class="num">Profit / loss</th></tr></thead><tbody id="ser"></tbody></table></div>
+
+  <section class="card" style="margin-top:26px">
+    <h2>Expenses</h2>
+    <p class="muted">Add what the agency spends (advertising, salaries, tools and so on). Expenses are taken off the profit.</p>
+    <div id="eMsg" class="alert"></div>
+    <form id="eF" novalidate><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));align-items:end">
+      <div><label for="eD">Date</label><input type="date" id="eD"></div>
+      <div><label for="eC">Category</label><select id="eC"></select></div>
+      <div><label for="eA">Amount (&#8377;)</label><input id="eA" type="number" min="1" step="0.01"></div>
+      <div><label for="eN">Note</label><input id="eN" maxlength="200" placeholder="Optional"></div>
+      <div><button class="btn" type="submit" style="margin:0">Add expense</button></div></div></form>
+    <div class="tbl" style="margin-top:16px"><table style="min-width:560px"><thead><tr><th>Date</th><th>Category</th><th>Note</th><th class="num">Amount</th><th></th></tr></thead><tbody id="exp"></tbody></table></div>
+  </section>
+</main>
+<script src="assets/auth.js"></script><script src="assets/shop.js"></script>
+<script>
+var R = null, PRESET = 'month';
+function dstr(d) { return dayStr(d); }
+function range(p) {
+  var t = new Date(); t.setHours(0, 0, 0, 0); var f = new Date(t);
+  if (p === 'today') { } else if (p === 'week') f.setDate(t.getDate() - ((t.getDay() + 6) % 7));
+  else if (p === 'month') f.setDate(1); else if (p === 'year') { f.setMonth(0); f.setDate(1); }
+  else if (p === '7d') f.setDate(t.getDate() - 6); else if (p === '30d') f.setDate(t.getDate() - 29);
+  else if (p === '12m') { f.setFullYear(t.getFullYear() - 1); f.setDate(f.getDate() + 1); }
+  return [dstr(f), dstr(t)];
+}
+var PRESETS = [['today', 'Today'], ['week', 'This week'], ['month', 'This month'], ['year', 'This year'], ['7d', 'Last 7 days'], ['30d', 'Last 30 days'], ['12m', 'Last 12 months']];
+function drawPresets() { $('presets').innerHTML = PRESETS.map(function (p) { return '<button class="pill' + (p[0] === PRESET ? ' on' : '') + '" data-p="' + p[0] + '">' + p[1] + '</button>'; }).join(''); }
+$('presets').addEventListener('click', function (e) { var b = e.target.closest('[data-p]'); if (!b) return; PRESET = b.dataset.p; var r = range(PRESET); $('from').value = r[0]; $('to').value = r[1]; drawPresets(); load(); });
+$('apply').onclick = function () { PRESET = ''; drawPresets(); load(); };
+$('grp').onchange = $('basis').onchange = load;
+
+function short(n) { var a = Math.abs(n), s = n < 0 ? '-' : ''; if (a >= 1e7) return s + '₹' + (a / 1e7).toFixed(1).replace(/\.0$/, '') + 'Cr'; if (a >= 1e5) return s + '₹' + (a / 1e5).toFixed(1).replace(/\.0$/, '') + 'L'; if (a >= 1e3) return s + '₹' + (a / 1e3).toFixed(1).replace(/\.0$/, '') + 'K'; return s + '₹' + Math.round(a); }
+function pct(cur, prev) { if (!prev) return cur ? '<span class="muted">new</span>' : ''; var p = (cur - prev) * 100 / Math.abs(prev); return '<span class="' + (p >= 0 ? 'up' : 'down') + '">' + (p >= 0 ? '&#9650; ' : '&#9660; ') + Math.abs(p).toFixed(0) + '%</span>'; }
+function niceMax(v) { if (v <= 0) return 1; var p = Math.pow(10, Math.floor(Math.log10(v))), f = v / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; }
+
+function chart(series) {
+  var W = 940, H = 330, ml = 64, mr = 16, mt = 16, mb = 52, n = series.length;
+  var spend = series.map(function (s) { return s.cost + s.expenses; });
+  var hi = Math.max.apply(null, series.map(function (s) { return s.revenue; }).concat(spend, series.map(function (s) { return s.profit; }), [0]));
+  var lo = Math.min.apply(null, series.map(function (s) { return s.profit; }).concat([0]));
+  var top = niceMax(hi), bot = lo < 0 ? -niceMax(-lo) : 0;
+  if (top === bot) top = bot + 1;
+  var pw = W - ml - mr, ph = H - mt - mb, bw = pw / n;
+  function y(v) { return mt + (top - v) * ph / (top - bot); }
+  var g = '';
+  for (var i = 0; i <= 5; i++) { var v = bot + (top - bot) * i / 5; g += '<line x1="' + ml + '" x2="' + (W - mr) + '" y1="' + y(v) + '" y2="' + y(v) + '" stroke="#1f2f52"/><text x="' + (ml - 8) + '" y="' + (y(v) + 4) + '" text-anchor="end" fill="#9fb0d3" font-size="11">' + short(v) + '</text>'; }
+  g += '<line x1="' + ml + '" x2="' + (W - mr) + '" y1="' + y(0) + '" y2="' + y(0) + '" stroke="#5b6f9c"/>';
+  var step = Math.ceil(n / 14), line = [], dots = '';
+  series.forEach(function (s, i) {
+    var x0 = ml + i * bw, w = Math.max(2, bw * 0.34), cx = x0 + bw / 2, tip = '<title>' + s.label + ': sales ' + inr(s.revenue) + ', costs ' + inr(s.cost) + ', expenses ' + inr(s.expenses) + ', ' + (s.profit >= 0 ? 'profit ' : 'loss ') + inr(Math.abs(s.profit)) + ' (' + s.orders + ' orders)</title>';
+    g += '<g>' + tip + '<rect x="' + (cx - w - 1) + '" y="' + y(s.revenue) + '" width="' + w + '" height="' + Math.max(0, y(0) - y(s.revenue)) + '" fill="#2f8cff" rx="2"/>' +
+      '<rect x="' + (cx + 1) + '" y="' + y(spend[i]) + '" width="' + w + '" height="' + Math.max(0, y(0) - y(spend[i])) + '" fill="#fb923c" rx="2"/>' +
+      '<rect x="' + x0 + '" y="' + mt + '" width="' + bw + '" height="' + ph + '" fill="transparent"/></g>';
+    line.push(cx + ',' + y(s.profit));
+    dots += '<circle cx="' + cx + '" cy="' + y(s.profit) + '" r="3.5" fill="' + (s.profit >= 0 ? '#4ade80' : '#ff7a8a') + '">' + tip + '</circle>';
+    if (i % step === 0) g += '<text x="' + cx + '" y="' + (H - mb + 18) + '" text-anchor="middle" fill="#9fb0d3" font-size="11">' + s.label + '</text>';
+  });
+  if (n > 1) g += '<polyline points="' + line.join(' ') + '" fill="none" stroke="#4ade80" stroke-width="2"/>';
+  $('chart').innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Sales, costs and profit by period">' + g + dots + '</svg>';
+}
+function draw() {
+  var T = R.totals, P = R.previous, net = T.net_profit, grp = R.group;
+  var from = new Date(R.from + 'T00:00'), to = new Date(R.to + 'T00:00'), fmt = { day: 'numeric', month: 'short', year: 'numeric' };
+  $('verdict').className = 'verdict ' + (T.orders === 0 && T.expenses === 0 ? '' : net >= 0 ? 'profit' : 'loss');
+  $('verdict').innerHTML = T.orders === 0 && T.expenses === 0 ? 'No sales or expenses between ' + from.toLocaleDateString([], fmt) + ' and ' + to.toLocaleDateString([], fmt) + '.' :
+    'From <b>' + from.toLocaleDateString([], fmt) + '</b> to <b>' + to.toLocaleDateString([], fmt) + '</b> the agency made a <b>' + (net >= 0 ? 'profit' : 'loss') + ' of ' + inr(Math.abs(net)) + '</b> on sales of ' + inr(T.revenue) + (T.margin_pct !== null ? ' (' + T.margin_pct + '% of sales)' : '') + '.';
+  function k(label, val, sub, cls) { return '<div class="card kpi ' + (cls || '') + '"><span>' + label + '</span><b>' + val + '</b><small>' + sub + '</small></div>'; }
+  $('kpis').innerHTML = k('Orders', T.orders, 'Average ' + inr(T.avg_order)) + k('Sales', inr(T.revenue), pct(T.revenue, P.revenue) + ' vs the period before') +
+    k('Cost of services', inr(T.cost), 'What it cost to deliver') + k('Gross profit', inr(T.gross_profit), 'Sales minus cost of services', T.gross_profit < 0 ? 'badk' : '') +
+    k('Expenses', inr(T.expenses), pct(T.expenses, P.expenses) + ' vs the period before') + k(net >= 0 ? 'Net profit' : 'Net loss', inr(Math.abs(net)), pct(net, P.net_profit) + ' vs the period before', net >= 0 ? 'good' : 'badk');
+  chart(R.series);
+  var rows = [['Sales from services', T.revenue - T.interest, ''], ['EMI interest collected', T.interest, 'ind'], ['Total sales', T.revenue, 'total'], ['Less: cost of services', -T.cost, ''], ['Gross profit', T.gross_profit, 'total']];
+  R.expenses_by_category.forEach(function (c) { rows.push(['Less: ' + c.category, -c.amount, 'ind']); });
+  rows.push([net >= 0 ? 'Net profit' : 'Net loss', net, 'total']);
+  $('pl').innerHTML = rows.map(function (r) { return '<tr class="' + (r[2] === 'total' ? 'total' : '') + '"><td class="' + (r[2] === 'ind' ? 'ind' : '') + '">' + r[0] + '</td><td class="num ' + (r[1] < 0 && r[2] === 'total' ? 'down' : '') + '">' + inr(r[1]) + '</td></tr>'; }).join('');
+  $('byMethod').innerHTML = R.by_method.map(function (m) { return '<tr><td>' + esc(m.label) + '</td><td class="num">' + m.orders + '</td><td class="num">' + inr(m.revenue) + '</td></tr>'; }).join('') || '<tr><td colspan="3" class="muted">No sales.</td></tr>';
+  $('top').innerHTML = R.top_customers.map(function (c) { return '<tr><td>' + esc(c.name) + '<br><span class="muted">' + esc(c.email) + '</span></td><td class="num">' + c.orders + '</td><td class="num">' + inr(c.revenue) + '</td></tr>'; }).join('') || '<tr><td colspan="3" class="muted">No customers.</td></tr>';
+  $('extra').innerHTML = 'Waiting for payment: <b>' + inr(R.pending.amount) + '</b> in ' + R.pending.orders + ' order(s). Cancelled or refunded: <b>' + inr(R.lost.amount) + '</b> in ' + R.lost.orders + ' order(s). These are not counted in sales.' + (R.basis === 'paid' ? ' (Only paid orders are counted above.)' : '');
+  $('bySvc').innerHTML = R.by_service.map(function (s) { var m = s.revenue ? Math.round(s.profit * 1000 / s.revenue) / 10 : 0; return '<tr><td>' + esc(s.name) + '</td><td class="num">' + s.qty + '</td><td class="num">' + inr(s.revenue) + '</td><td class="num">' + inr(s.cost) + '</td><td class="num ' + (s.profit < 0 ? 'down' : '') + '">' + inr(s.profit) + '</td><td class="num">' + m + '%</td></tr>'; }).join('') || '<tr><td colspan="6" class="muted">No sales in this period.</td></tr>';
+  $('serT').textContent = 'By ' + grp;
+  $('ser').innerHTML = R.series.map(function (s) { return '<tr><td>' + esc(s.label) + '</td><td class="num">' + s.orders + '</td><td class="num">' + inr(s.revenue) + '</td><td class="num">' + inr(s.cost) + '</td><td class="num">' + inr(s.expenses) + '</td><td class="num ' + (s.profit < 0 ? 'down' : 'up') + '">' + inr(s.profit) + '</td></tr>'; }).join('');
+  $('eC').innerHTML = R.expense_categories.map(function (c) { return '<option>' + esc(c) + '</option>'; }).join('');
+  $('exp').innerHTML = R.expenses.map(function (e) { return '<tr><td>' + esc(e.date) + (e.is_demo ? ' <span class="badge demo">sample</span>' : '') + '</td><td>' + esc(e.category) + '</td><td>' + esc(e.note) + '</td><td class="num">' + inr(e.amount) + '</td><td><button class="btn danger sm" data-x="' + e.id + '">Delete</button></td></tr>'; }).join('') || '<tr><td colspan="5" class="muted">No expenses in this period.</td></tr>';
+}
+async function load() {
+  var q = 'from=' + $('from').value + '&to=' + $('to').value + '&group=' + $('grp').value + '&basis=' + $('basis').value;
+  var r = await call('report.php?' + q);
+  if (!r.ok) { showMsg('msg', r.error); return; }
+  showMsg('msg', ''); R = r; $('from').value = r.from; $('to').value = r.to; draw();
+}
+$('exp').addEventListener('click', async function (e) {
+  var b = e.target.closest('[data-x]'); if (!b || !confirm('Delete this expense?')) return;
+  var r = await call('expense_save.php', { action: 'delete', id: +b.dataset.x }); if (!r.ok) { showMsg('eMsg', r.error); return; } load();
+});
+$('eF').addEventListener('submit', async function (e) {
+  e.preventDefault(); showMsg('eMsg', '');
+  var r = await call('expense_save.php', { action: 'add', date: $('eD').value, category: $('eC').value, amount: $('eA').value, note: $('eN').value });
+  if (!r.ok) { showMsg('eMsg', r.error); return; }
+  $('eA').value = ''; $('eN').value = ''; toast('Expense added');
+  if ($('eD').value < $('from').value || $('eD').value > $('to').value) showMsg('eMsg', 'Added. It is outside the period shown, so change the dates to see it.', true);
+  load();
+});
+$('csv').onclick = function () {
+  if (!R) return; var T = R.totals;
+  var rows = [['Nexus Media Labs: sales, profit and loss'], ['From', R.from, 'To', R.to], [], ['Total sales', T.revenue], ['Cost of services', T.cost], ['Gross profit', T.gross_profit], ['Expenses', T.expenses], ['Net profit / loss', T.net_profit], [],
+    ['Period', 'Orders', 'Sales', 'Cost', 'Expenses', 'Profit / loss']];
+  R.series.forEach(function (s) { rows.push([s.label, s.orders, s.revenue, s.cost, s.expenses, s.profit]); });
+  rows.push([], ['Service', 'Sold', 'Sales', 'Cost', 'Profit']); R.by_service.forEach(function (s) { rows.push([s.name, s.qty, s.revenue, s.cost, s.profit]); });
+  csvDownload('sales-report-' + R.from + '-to-' + R.to + '.csv', rows);
+};
+(async function () {
+  if (!await guard(['admin'])) return;
+  var r = range('month'); $('from').value = r[0]; $('to').value = r[1]; $('eD').value = dstr(new Date()); drawPresets(); load();
+})();
+</script></body></html>
